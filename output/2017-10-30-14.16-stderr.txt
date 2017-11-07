@@ -1,0 +1,7 @@
+2017-10-30 14:16:08,925    INFO pytocl.protocol Registering driver client with server ('localhost', 3001).
+2017-10-30 14:16:08,925    INFO pytocl.protocol Registering client.
+2017-10-30 14:16:08,930    INFO pytocl.protocol Connection successful.
+2017-10-30 14:16:29,711    INFO pytocl.protocol Server requested shutdown.
+2017-10-30 14:16:29,711    INFO pytocl.protocol Disconnecting from racing server.
+2017-10-30 14:16:29,711    INFO pytocl.analysis Saved 38092 log entries.
+2017-10-30 14:16:29,838    INFO pytocl.protocol Client stopped.

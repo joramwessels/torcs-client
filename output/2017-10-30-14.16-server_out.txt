@@ -1,0 +1,8 @@
+Waiting for request on port 3001
+Timeout for client answer
+Sim Time:   264.61 [s], Leader Laps:    1, Leader Distance:    5.784 [km]
+Timeout for client answer
+Sim Time:   526.70 [s], Leader Laps:    2, Leader Distance:   11.568 [km]
+Timeout for client answer
+Timeout for client answer
+Sim Time:   794.25 [s], Leader Laps:    3, Leader Distance:   17.352 [km]
