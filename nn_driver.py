@@ -1,77 +1,104 @@
 from pytocl.driver import Driver
 from pytocl.car import State, Command
+import typing as t
+import torch
+from torch.autograd import Variable
+import torch.nn as nn
+import torch.optim as optim
+import time
 
+# Hyper Parameters
+hidden_size = 10
+num_epochs = 5
+learning_rate = 0.01
+n_actions = 3
+n_states = 22
+save_to = "simple_nn.data"
 
-class MyDriver(Driver):
-	def drive(self, carstate):
+class FFNNDriver(Driver):
+
+	def __init__(self, nn_data_filepath):
+		super(FFNNDriver, self).__init__()
+		self.model = SimpleNN(n_states, hidden_size, n_actions)
+		self.model.load_state_dict(torch.load(save_to))
+
+	def drive(self, carstate: State) -> Command:
+		tensor = carstate_to_tensor(carstate)
+		out_command = self.model(tensor).data
+		print(out_command)
 		command = Command()
-		command.steering = carstate.angle / 180
-		if carstate.angle > 30 or carstate.angle < -30:
-			command.brake = 0.5
-			command.accelerator = 0
-		else:
-			command.brake = 0
-			command.accelerator = 1
-		command.gear = 1
+		command.accelerator = out_command[0]
+		command.brake = out_command[1]
+		command.steering = out_command[2]
 		return command
 
-def read_dataset(filename):
-    with open(filename, "r") as f:
-        for line in f:
-            tag, words = line.lower().strip().split(" ||| ")
-            yield ([w2i[x] for x in words.split(" ")], t2i[tag])
+def carstate_to_tensor(carstate: State) -> FloatTensor:
+	torch.FloatTensor([carstate.floats_value])
+
+def read_dataset(filename: str) -> t.Iterable[t.Tuple[t.List[float], t.List[float]]]:
+	with open(filename, "r") as f:
+		next(f) # as the file is a csv, we don't want the first line
+		for line in f:
+			yield ([float(x) for x in line.strip().split(",")[0:3]], [float(x) for x in line.strip().split(",")[3:]])
 
 # Read in the data
-train = list(read_dataset("data/classes/train.txt"))
-w2i = defaultdict(lambda: UNK, w2i)
-dev = list(read_dataset("data/classes/test.txt"))
-nwords = len(w2i)
-ntags = len(t2i)
-
+aalborg = list(read_dataset("train_data/aalborg.csv"))
+alpine_1 = list(read_dataset("train_data/alpine-1.csv"))
+speedway = list(read_dataset("train_data/f-speedway.csv"))
+train = aalborg + alpine_1 + speedway
 
 class SimpleNN(nn.Module):
 
-    def __init__(self, nstates, ncommands):
-        super(SimpleNN, self).__init__()
-        self.linear = nn.Linear(nstates, ncommands, bias=True)
+	def __init__(self, input_d, hidden_d, out_d):
+		super(SimpleNN, self).__init__()
+		self.layer_1 = nn.Linear(input_d, hidden_d)
+		self.relu = nn.ReLU()
+		self.layer_2 = nn.Linear(hidden_d, out_d)
 
-    def forward(self, inputs):
-        embeds = self.linear(inputs)
-        logits = torch.sum(embeds, 1) + self.bias
-        return logits
+	def forward(self, inputs):
+		out = self.layer_1(inputs)
+		out = self.relu(out)
+		out = self.layer_2(out)
+		return out
 
+def create_model():
+	model = SimpleNN(n_states, hidden_size, n_actions)
+	print(model)
+	optimizer = optim.SGD(model.parameters(), lr=learning_rate)
 
-model = SimpleNN(nwords, ntags)
-print(model)
+	# I'm not sure about this loss...
+	loss = nn.MSELoss()
 
-optimizer = optim.SGD(model.parameters(), lr=0.01)
+	for ITER in range(num_epochs):
 
-for ITER in range(100):
+		train_loss = 0.0
+		start = time.time()
 
-    random.shuffle(train)
-    train_loss = 0.0
-    start = time.time()
+		# there is one state which is "broken" as it only contains 18 values. Therefore, use try-except
+		try:
 
-    for words, tag in train:
+			for command, state in train:
+				# forward pass
+				in_state = Variable(torch.FloatTensor(state))
+				y_pred = model(in_state)
+				y = Variable(torch.FloatTensor(command))
+				output = loss(y_pred, y)
+				train_loss += output.data[0]
 
-        # forward pass
-        lookup_tensor = Variable(torch.LongTensor([words]))
-        scores = model(lookup_tensor)
-        loss = nn.CrossEntropyLoss()
-        target = Variable(torch.LongTensor([tag]))
-        output = loss(scores, target)
-        train_loss += output.data[0]
+				# backward pass
+				optimizer.zero_grad()
+				output.backward()
 
-        # backward pass
-        model.zero_grad()
-        output.backward()
+				# update weights
+				optimizer.step()
+		except:
+			print("error:", in_state)
 
-        # update weights
-        optimizer.step()
+		print("iter %r: train loss/sent=%.4f, time=%.2fs" %(ITER, train_loss/len(train), time.time()-start))
+	torch.save(model.state_dict(), save_to)
 
-    print("iter %r: train loss/sent=%.4f, time=%.2fs" %
-          (ITER, train_loss/len(train), time.time()-start))
+def main():
+    create_model()
 
-    # evaluate
-    _, _, acc = evaluate(model, dev)
-    print("iter %r: test acc=%.4f" % (ITER, acc))
+if __name__ == "__main__":
+    main()
