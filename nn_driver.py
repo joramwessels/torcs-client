@@ -12,34 +12,42 @@ hidden_size = 10
 num_epochs = 5
 learning_rate = 0.01
 n_actions = 3
-n_states = 22
+n_states = 3
 save_to = "simple_nn.data"
 
 class FFNNDriver(Driver):
 
-	def __init__(self, nn_data_filepath):
+	def __init__(self):
 		super(FFNNDriver, self).__init__()
 		self.model = SimpleNN(n_states, hidden_size, n_actions)
 		self.model.load_state_dict(torch.load(save_to))
+		self.last_command = None
+		self.sensor_data []
 
 	def drive(self, carstate: State) -> Command:
-		tensor = carstate_to_tensor(carstate)
-		out_command = self.model(tensor).data
-		print(out_command)
+		x_in = Variable(carstate_to_tensor(carstate))
+		out_command = self.model(x_in).data
 		command = Command()
 		command.accelerator = out_command[0]
 		command.brake = out_command[1]
 		command.steering = out_command[2]
+		command.gear = 1
+		if not self.last_command or self.last_command.focus == -45:
+			command.focus = 45
+		else:
+			command.focus = -45
+		self.last_command = command
 		return command
 
-def carstate_to_tensor(carstate: State) -> FloatTensor:
-	torch.FloatTensor([carstate.floats_value])
+def carstate_to_tensor(carstate: State) -> torch.FloatTensor:
+	print(carstate.focused_distances_from_edge)
+	return torch.FloatTensor([carstate.speed_x, carstate.race_position, carstate.angle])
 
 def read_dataset(filename: str) -> t.Iterable[t.Tuple[t.List[float], t.List[float]]]:
 	with open(filename, "r") as f:
 		next(f) # as the file is a csv, we don't want the first line
 		for line in f:
-			yield ([float(x) for x in line.strip().split(",")[0:3]], [float(x) for x in line.strip().split(",")[3:]])
+			yield ([float(x) for x in line.strip().split(",")[0:3]], [float(x) for x in line.strip().split(",")[3:6]])
 
 # Read in the data
 aalborg = list(read_dataset("train_data/aalborg.csv"))

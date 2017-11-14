@@ -5,4 +5,4 @@ from my_driver import MyDriver
 from nn_driver import FFNNDriver
 
 if __name__ == '__main__':
-    main(FFNNDriver("simple_nn.data"))
+    main(FFNNDriver())
