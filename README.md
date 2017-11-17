@@ -27,8 +27,13 @@ This is a copy of the reimplementation in Python 3 by @moltob of the original SC
 - Implement data reader which parses driverlogs so that we can use them directly for learning
 - Create a simple setup/bot to generate data.
 - Expand data generator to have multiple competitors
-- Implement speed/angle NN predictor
+- Implement speed/angle NN predictor (almost done)
 - Add an evolutionary approach (NEAT might be a simple answer)
+- Implement safety mechanism, when we go off track, stop or turn around. Return us to the middle of the track.
+
+### Neural network approach
+We use distance sensors in around car and angle on road to predict speed and steering.
+This provides a good baseline for simply driving on the track.
 
 ## `Client`
 
