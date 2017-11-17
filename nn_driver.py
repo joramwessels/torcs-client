@@ -6,6 +6,7 @@ from torch.autograd import Variable
 import torch.nn as nn
 import torch.optim as optim
 import time
+import os
 
 # Hyper Parameters
 hidden_size = 10
@@ -13,7 +14,8 @@ num_epochs = 5
 learning_rate = 0.01
 n_actions = 3
 n_states = 3
-save_to = "simple_nn.data"
+path = os.path.abspath(os.path.dirname(__file__))
+save_to = os.path.join(path, "simple_nn.data")
 
 class FFNNDriver(Driver):
 
@@ -22,7 +24,7 @@ class FFNNDriver(Driver):
 		self.model = SimpleNN(n_states, hidden_size, n_actions)
 		self.model.load_state_dict(torch.load(save_to))
 		self.last_command = None
-		self.sensor_data []
+		self.sensor_data = []
 
 	def drive(self, carstate: State) -> Command:
 		x_in = Variable(carstate_to_tensor(carstate))
@@ -39,8 +41,32 @@ class FFNNDriver(Driver):
 		self.last_command = command
 		return command
 
+	def get_steer(self, target_pos, actual_pos, epsilon=0.01):
+		angle = carstate.angle
+		error = target_pos - actual_pos
+		angle = angle + error * epsilon
+		steer = angle/SteerLock
+		return steer
+
+	def get_accel(self, target_speed, actual_speed):
+		accel = 0
+		if (target_speed - actual_speed) > 0:
+			accel = (target_speed - actual_speed)/20
+		if target_speed - actual_speed > 20:
+			accel = 1
+		return accel
+
+	def get_break(self, target_speed, actual_speed):
+		brake = 0
+		if (target_speed - actual_speed) < 0:
+			brake = -(target_speed - actual_speed)/20
+		if target_speed - actual_speed < -20:
+			brake = 1
+		return brake
+
 def carstate_to_tensor(carstate: State) -> torch.FloatTensor:
-	print(carstate.focused_distances_from_edge)
+	if carstate.focused_distances_from_egde_valid:
+		print(carstate.focused_distances_from_edge)
 	return torch.FloatTensor([carstate.speed_x, carstate.race_position, carstate.angle])
 
 def read_dataset(filename: str) -> t.Iterable[t.Tuple[t.List[float], t.List[float]]]:
@@ -49,11 +75,6 @@ def read_dataset(filename: str) -> t.Iterable[t.Tuple[t.List[float], t.List[floa
 		for line in f:
 			yield ([float(x) for x in line.strip().split(",")[0:3]], [float(x) for x in line.strip().split(",")[3:6]])
 
-# Read in the data
-aalborg = list(read_dataset("train_data/aalborg.csv"))
-alpine_1 = list(read_dataset("train_data/alpine-1.csv"))
-speedway = list(read_dataset("train_data/f-speedway.csv"))
-train = aalborg + alpine_1 + speedway
 
 class SimpleNN(nn.Module):
 
@@ -70,6 +91,13 @@ class SimpleNN(nn.Module):
 		return out
 
 def create_model():
+	# Read in the data
+	save_to = os.path.join(path, "simple_nn.data")
+	aalborg = list(read_dataset(os.path.join(path, "train_data/aalborg.csv")))
+	alpine_1 = list(read_dataset(os.path.join(path, "train_data/alpine-1.csv")))
+	speedway = list(read_dataset(os.path.join(path, "train_data/f-speedway.csv")))
+	train = aalborg + alpine_1 + speedway
+
 	model = SimpleNN(n_states, hidden_size, n_actions)
 	print(model)
 	optimizer = optim.SGD(model.parameters(), lr=learning_rate)
