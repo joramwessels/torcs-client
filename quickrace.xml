@@ -48,8 +48,12 @@
     <attnum name="focused idx" val="0"/>
     <attstr name="focused module" val="scr_server"/>
     <section name="1">
-      <attnum name="idx" val="0"/>
+      <attnum name="idx" val="1"/>
       <attstr name="module" val="scr_server"/>
+    </section>
+    <section name="2">
+      <attnum name="idx" val="2"/>
+      <attstr name="module" val="bt"/>
     </section>
 
   </section>

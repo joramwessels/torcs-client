@@ -1,5 +1,6 @@
 from pytocl.driver import Driver
 from pytocl.car import State, Command
+from pytocl.protocol import Client
 import torch
 from torch.autograd import Variable
 import torch.nn as nn
@@ -9,6 +10,13 @@ import sys
 from os import listdir
 from os.path import isfile, join
 import driver_support
+
+class FFNN_Client(Client):
+
+	def __init__(self, port, hidden_dimension, in_file):
+		super(FFNN_Driver, self).__init__(port=port,
+							driver=FFNN_Driver(hidden_dimension=hidden_dimension,
+												in_file=in_file))
 
 class FFNN_Driver(Driver):
 
