@@ -1,58 +1,58 @@
-# Computational Intelligence project team 33
-
+# Computational Intelligence project team 32
 
 # Authors
 Haukur Páll Jónsson, ADD YOURSELVES
 
+# Things to do
+- Test actual setup for turn in
+- This includes checking if we need to worry about ports
+- Implement data reader which parses driverlogs so that we can use them directly for learning
+- Create a simple setup/bot to generate data.
+- Expand data generator to have multiple competitors
+- Implement speed/angle FFNN predictor (almost done)
+- Implement simple (acc/break/steer) predictor FFNN
+- Add an evolutionary approach (NEAT might be a simple answer)
+- Implement safety mechanism, when we go off track, stop or turn around. Return us to the middle of the track.
+- Implement sec2sec NN
 
 # Starting it up
+Start the server by calling
 
   torcs
-  # race-quick-race
+
+And then start the client (in a different process)
+
   ./start.sh
 
-or
+To start a race without GUI. See Configuration [Configuration]
 
-  /home/haukur/ci/torcs-server/torcs_tournament.py /home/haukur/ci/torcs-server/quickrace.yml
+  ./torcs_tournament.py quickrace.yml
 
 
 # Torcs-Client
 
-See pdf:
-http://www.berniw.org/aboutme/publications/torcs.pdf
+- TORCS manuals
+* https://arxiv.org/pdf/1304.1672.pdf
+* http://www.berniw.org/aboutme/publications/torcs.pdf
 
-This is a copy of the reimplementation in Python 3 by @moltob of the original SCRC TORCS client pySrcrcClient from @lanquarden. It is used to teach ideas of computational intelligence. The file `my_driver.py` contains a shell to start writing your own driver.
+- Papers
+* http://ieeexplore.ieee.org/document/5286480/?reload=true
+* http://ieeexplore.ieee.org/abstract/document/7848001/
+* http://ieeexplore.ieee.org/abstract/document/7317916/
+* http://julian.togelius.com/Togelius2006Making.pdf
 
-## Things to do
-- Implement data reader which parses driverlogs so that we can use them directly for learning
-- Create a simple setup/bot to generate data.
-- Expand data generator to have multiple competitors
-- Implement speed/angle NN predictor (almost done)
-- Add an evolutionary approach (NEAT might be a simple answer)
-- Implement safety mechanism, when we go off track, stop or turn around. Return us to the middle of the track.
+- Useful links:
+* Server https://github.com/mpvharmelen/torcs-server
+* Client https://github.com/mpvharmelen/torcs-client
+* Blog http://www.xed.ch/help/torcs.html
 
-### Neural network approach
+## Configuration
+ls /usr/local/share/games/torcs/drivers/
+berniw   berniw3  damned  inferno   lliaw     scr_server  tita
+berniw2  bt       human   inferno2  olethros  sparkle
+
+# Learning
+
+## Neural network approach
 We use distance sensors in around car and angle on road to predict speed and steering.
 This provides a good baseline for simply driving on the track.
-
-## `Client`
-
-* top level class
-* handles _all_ aspects of networking (connection management, encoding)
-* decodes class `State` from message from server, `state = self.decode(msg)`
-* encodes class `Command` for message to server, `msg = self.encode(command)`
-* internal state connection properties only and driver instance
-* use `Client(driver=your_driver, <other options>)` to use your own driver
-
-## `Driver`
-
-* encapsulates driving logic only
-* main entry point: `drive(state: State) -> Command`
-
-## `State`
-
-* represents the incoming car state
-
-## `Command`
-
-* holds the outgoing driving command
