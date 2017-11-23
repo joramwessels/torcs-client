@@ -1,1 +1,1 @@
-run.py
+start_ffnn_2_pred.sh

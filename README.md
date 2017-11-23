@@ -46,10 +46,16 @@ To start a race without GUI. See Configuration [Configuration]
 * Client https://github.com/mpvharmelen/torcs-client
 * Blog http://www.xed.ch/help/torcs.html
 
-## Configuration
-ls /usr/local/share/games/torcs/drivers/
+## Data generation
+The best bots are: lliaw, inferno, olethros, tita
+
+Total bots:
 berniw   berniw3  damned  inferno   lliaw     scr_server  tita
 berniw2  bt       human   inferno2  olethros  sparkle
+
+To generate data call (it assumes linux and lliaw.cpp compiled with TORCS)
+
+  python3.6 data_generator.py --drivers lliaw --tracks all --length 0 --laps 1 --file quickrace.xml
 
 # Learning
 
