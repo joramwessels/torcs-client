@@ -11,15 +11,6 @@ from os import listdir
 from os.path import isfile, join
 import driver_support
 
-class FFNN__2_Pred_Client(Client):
-
-	def __init__(self, hidden_dimension, in_file):
-		super(FFNN__2_Pred_Client, self).__init__(
-							driver=FFNN_2_Driver(hidden_dimension=hidden_dimension,
-												in_file=in_file)
-							)
-
-
 class FFNN_2_Driver(Driver):
 
 	def __init__(self, hidden_dimension, in_file):
@@ -47,7 +38,8 @@ class FFNN_2_Driver(Driver):
 		command.brake = driver_support.get_break(speed_target, carstate.speed_x)
 		command.steering = driver_support.get_steer(target_pos=steering_target,
 											actual_pos=self.last_command.steering,
-											angle=carstate.angle)
+											angle=carstate.angle,
+											epsilon=1)
 
 		command.gear = driver_support.get_gear(carstate.rpm, carstate.gear)
 		#command.focus = -self.last_command.focus
