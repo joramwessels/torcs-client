@@ -1,7 +1,7 @@
 # Computational Intelligence project team 32
 
 # Authors
-Haukur Páll Jónsson, ADD YOURSELVES
+Haukur Páll Jónsson, Joram Wessels, Yi-ting Lin
 
 # Things to do
 - Test actual setup for turn in
@@ -56,6 +56,9 @@ berniw2  bt       human   inferno2  olethros  sparkle
 To generate data call (it assumes linux and lliaw.cpp compiled with TORCS)
 
   python3.6 data_generator.py --drivers lliaw --tracks all --length 0 --laps 1 --file quickrace.xml
+
+Training data files in [train_single](ttps://github.com/joramwessels/torcs-client/tree/master/train_single) are ordered as follows:  
+accelCmd, brakeCmd, steerCmd, angle, curLapTime, distFromStartLine, distRaced, fuel, gear, racePos, engineRpm, speedX, speedY, speedZ, trackSensorOut (0-18), distToMiddle, oppSensorOut (0-35), 
 
 # Learning
 
