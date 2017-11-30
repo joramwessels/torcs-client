@@ -27,6 +27,10 @@ class Steer_Acc_Break(nn.Module):
 		out = self.layer_2(out)
 		return out
 
+def carstate_to_tensor(carstate):
+	# y=accel, break, stear, x=angle, speed, distance*19, distToMiddle
+	return torch.FloatTensor([carstate.angle, carstate.speed_x] + list(carstate.distances_from_edge) + [carstate.distance_from_center])
+
 def create_model(out_file, training_folder, learning_rate, epochs, hidden_dimension):
 	# Read in the data
 	training = []
