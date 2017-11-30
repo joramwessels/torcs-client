@@ -57,6 +57,12 @@ To generate data call (it assumes linux and lliaw.cpp compiled with TORCS)
 
   python3.6 data_generator.py --drivers lliaw --tracks all --length 0 --laps 1 --file quickrace.xml
 
+## Data
+-  0     1     2      3      4             5              6       7    8    9
+- accel break steer angle curLapTime distFromStartLine distRaced fuel gear racepos
+- 10    11      12    13     14-22             23          24-49
+- rpm speedx speedy speedz tracksensor1_19 distToMiddle oppSenso1_36
+
 # Learning
 
 ## Neural network approach

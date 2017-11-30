@@ -4,4 +4,4 @@ from pytocl.main import main
 from ffnn_driver import FFNN_Driver
 
 if __name__ == '__main__':
-    main(FFNN_Driver(15, "ffnn.data"))
+    main(FFNN_Driver(15, "ffnn_driver.data"))
