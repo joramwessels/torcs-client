@@ -43,6 +43,20 @@ def map_to_gear(prediction):
 	else:
 		return index
 
+def binerize_input(value, mapping):
+    value = str(value)
+    index = mapping[value]
+    classes = [0 for x in range(len(mapping))]
+    classes[index] = 1
+    return classes
+
+def binerize_data_input(data, index, mapping):
+	new_data = []
+	for correct, state in data:
+		value = int(state[index])
+		new_data.append((correct, state[:index] + binerize_input(value, mapping) + state[:index + 1]))
+	return new_data
+
 def read_dataset_stear_speed(filename: str) -> t.Iterable[t.Tuple[t.List[float], t.List[float]]]:
 	with open(filename, "r") as f:
 		next(f) # as the file is a csv, we don't want the first line
@@ -68,6 +82,18 @@ def read_lliaw_dataset_gear_acc_bre_rpm_spe(filename: str) -> t.Iterable[t.Tuple
             # y=gear, x=accel, break, rpm, speedx
             line_values = [float(x) for x in line.strip().split(",")[:-1]]
             yield ([line_values[8]], [line_values[0], line_values[1], line_values[10], line_values[11]])
+
+def read_lliaw_dataset_gear_gear_rpm_spe(filename: str) -> t.Iterable[t.Tuple[t.List[float], t.List[float]]]:
+    with open(filename, "r") as f:
+    	for line in f:
+            #   0     1     2      3      4             5              6       7    8    9
+			# accel break steer angle curLapTime distFromStartLine distRaced fuel gear racepos
+            # 10    11      12    13     14-22             23          24-49
+            # rpm speedx speedy speedz tracksensor1_19 distToMiddle oppSenso1_36
+            # y=gear, x=gear, rpm
+            line_values = [float(x) for x in line.strip().split(",")[:-1]]
+            yield ([line_values[8]], [line_values[8], line_values[10]])
+
 
 def read_lliaw_dataset_acc_bre_steer_bunch(filename: str) -> t.Iterable[t.Tuple[t.List[float], t.List[float]]]:
     with open(filename, "r") as f:

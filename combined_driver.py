@@ -15,7 +15,7 @@ class Final_Driver(Driver):
 
     def __init__(self):
         super(Final_Driver, self).__init__()
-        self.gears = ffnn_gears.Gear_switcher(15)
+        self.gears = ffnn_gears.Gear_switcher(20)
         self.gears.load_state_dict(torch.load("./gear.data"))
         self.move = ffnn_move.Steer_Acc_Break(25)
         self.move.load_state_dict(torch.load("./move.data"))
@@ -27,7 +27,7 @@ class Final_Driver(Driver):
         # get speed/steering target
         accel_pred, break_pred, steer_pred = self.move(x_in_move).data
         print(accel_pred, break_pred, steer_pred)
-        x_in_gear = Variable(ffnn_gears.to_tensor(accel_pred, break_pred, carstate))
+        x_in_gear = Variable(ffnn_gears.to_tensor(carstate))
         gear = ffnn_gears.prediction_to_action(self.gears(x_in_gear))
         print(gear)
 

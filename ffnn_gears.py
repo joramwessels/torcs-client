@@ -10,6 +10,7 @@ import argparse
 import driver_support
 from os import listdir
 from os.path import isfile, join
+from collections import defaultdict
 
 
 gear_number = 9 # 0 = reverse, 1 = neutral, 2=1st gear, etc. to 7th gear
@@ -18,7 +19,7 @@ class Gear_switcher(nn.Module):
 
 	def __init__(self, hidden_dimension):
 		super(Gear_switcher, self).__init__()
-		n_states = 4
+		n_states = 1 + gear_number
 		n_actions = gear_number
 		self.layer_1 = nn.Linear(n_states, hidden_dimension)
 		self.layer_2 = nn.Linear(hidden_dimension, n_actions)
@@ -33,15 +34,21 @@ def gear_to_tensor(gear_value):
 	gear_value += 1
 	return torch.LongTensor([gear_value])
 
-def to_tensor(accel_cmd, break_cmd, carstate):
-	#accel, break, rpm, speedx
-	return torch.FloatTensor([accel_cmd, break_cmd, carstate.rpm, carstate.speed_x])
+def to_tensor(carstate):
+	#gear, rpm
+	return torch.FloatTensor(driver_support.binerize_input(value=carstate.gear, mapping=get_gear_map()) + [carstate.rpm])
 
 def prediction_to_action(prediction):
 	# the index is the gear
 	index = prediction.data.numpy().argmax()
 	index -= 1
 	return index
+
+def get_gear_map():
+	gear_to_index_map = dict()
+	for x in range(-1, gear_number - 1):
+		gear_to_index_map[str(x)] = x + 1
+	return gear_to_index_map
 
 def evaluate(model, data):
 	"""Evaluate a model on a data set."""
@@ -58,7 +65,6 @@ def evaluate(model, data):
 
 	print("percent correct={}".format(correct/len(data)))
 
-
 def split_data_set(data_set, eval_perc=0.2):
 	total = len(data_set)
 	split = int(total*eval_perc)
@@ -70,11 +76,11 @@ def create_model(out_file, training_folder, learning_rate, epochs, hidden_dimens
 	# Read in the data
 	training = []
 	for file_in in [join(training_folder, f) for f in listdir(training_folder) if isfile(join(training_folder, f))]:
-		training += list(driver_support.read_lliaw_dataset_gear_acc_bre_rpm_spe(file_in))
-
+		training += list(driver_support.read_lliaw_dataset_gear_gear_rpm_spe(file_in))
 
 
 	model = Gear_switcher(hidden_dimension)
+	training = driver_support.binerize_data_input(data=training, index=0, mapping=get_gear_map())
 	training, evalu = split_data_set(training)
 	print(model)
 	evaluate(model, evalu)
@@ -88,18 +94,18 @@ def create_model(out_file, training_folder, learning_rate, epochs, hidden_dimens
 		start = time.time()
 		lowest_gear = 10
 		highest_gear = 0
+		last_state = None
 
 		for y_true, state in training:
-			correct_gear = int(y_true[0])
-			if correct_gear > highest_gear:
-				highest_gear = correct_gear
-			if correct_gear < lowest_gear:
-				lowest_gear = correct_gear
+			if last_state == None:
+				last_state = state
+				continue
 
-			# forward pass
+			correct_gear = int(y_true[0])
+
 			optimizer.zero_grad()
 
-			in_state = Variable(torch.FloatTensor(state))
+			in_state = Variable(torch.FloatTensor(last_state))
 			y_pred = model(in_state).view(1, gear_number)
 			y_true = Variable(gear_to_tensor(correct_gear))
 
@@ -113,6 +119,7 @@ def create_model(out_file, training_folder, learning_rate, epochs, hidden_dimens
 
 			# update weights
 			optimizer.step()
+			last_state = state
 
 		print("last prediction made:pred={}, actual={}".format(prediction_to_action(y_pred), y_true))
 		print("iter %r: train loss/action=%.4f, time=%.2fs" %(ITER, train_loss/len(training), time.time()-start))
