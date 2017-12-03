@@ -3,29 +3,47 @@ from pytocl.car import State, Command
 import torch
 import time
 import sys
+import math
+import numpy as np
 from os import listdir
 from os.path import isfile, join
 import driver_support
 from torch.autograd import Variable
 
-import ffnn_gears
-import ffnn_move
+import ffnn_steer
+import ffnn_speed
 
 class Final_Driver(Driver):
 
     def __init__(self):
         super(Final_Driver, self).__init__()
-        self.gears = ffnn_gears.Gear_switcher(20)
-        self.gears.load_state_dict(torch.load("./gear.data"))
-        self.move = ffnn_move.Steer_Acc_Break(25)
-        self.move.load_state_dict(torch.load("./move.data"))
+        self.steer = ffnn_steer.Steer(10)
+        self.steer.load_state_dict(torch.load("./steer.data"))
+        self.speed = ffnn_speed.Speed(10)
+        self.speed.load_state_dict(torch.load("./ffnn_speed.data"))
         self.back_up_driver = Driver(logdata=False)
         self.bad_counter = 0
+        self.lap_counter = 0
+        self.brake_row = 0
+        self.angles = [90, 75, 60, 45, 30, 20, 15, 10, 5, 0, -5, -10, -15, -20, -30, -45, -60, -75, -90]
+        self.alphas = [math.radians(x) for x in self.angles]
 
+    def update_trackers(self, carstate):
+        if carstate.laptime == 0:
+            self.lap_counter += 1
+            print("Lap={}".format(self.lap_counter))
 
     def drive(self, carstate: State) -> Command:
+
         if self.in_a_bad_place(carstate):
             command = self.back_up_driver.drive(carstate)
+            if self.bad_counter >= 600 and is_stuck(carstate):
+                # we try reversing
+                command.gear = -command.gear
+                if command.gear < 0:
+                    command.steering = -command.steering
+                    command.gear = -1
+                self.bad_counter = 200
         else:
             command = self.make_next_command(carstate)
             # based on target, implement speed/steering manually
@@ -37,18 +55,96 @@ class Final_Driver(Driver):
         return command
 
     def make_next_command(self, carstate):
-        # translate carstate to tensor for NN
-        x_in_move = Variable(ffnn_move.carstate_to_tensor(carstate))
-        # get speed/steering target
-        accel_pred, break_pred, steer_pred = self.move(x_in_move).data
-        x_in_gear = Variable(ffnn_gears.to_tensor(carstate))
-        gear = ffnn_gears.prediction_to_action(self.gears(x_in_gear))
         command = Command()
-        command.accelerator = accel_pred
-        command.brake = break_pred
+        # we switch gears manually
+        gear = self.gear_decider(carstate)
+        # we get the steering prediction
+        steer_pred = self.steer_decider(carstate, [0.21, 1.56, 0.68, 0.53, 1.25])
+        # steer_pred = self.steer_decider_nn(carstate)
+        # pedal =[-1;1], combining breaking and accelerating to one variable
+        pedal = self.speed_decider(carstate)
+        if pedal >= 0.0:
+            command.accelerator = pedal*0.50
+            command.brake = 0
+        else:
+            # we need to make sure that we don't break hard enough and not too long
+            self.brake_row += 1
+            if self.brake_row <= 5:
+                command.brake = abs(pedal)*0.75
+            else:
+                self.brake_row = 0
+                command.brake = 0
+            command.accelerator = 0
         command.steering = steer_pred
         command.gear = gear
         return command
+
+    def steer_decider_nn(self, carstate):
+        x_in = ffnn_steer.carstate_to_variable(carstate)
+        steer_pred = self.steer(x_in).data[0]
+        return steer_pred
+
+    def steer_decider(self, carstate, steering_values):
+        alpha_index = np.argmax(carstate.distances_from_edge)
+        if is_straight_line(carstate=carstate, radians=self.alphas[alpha_index], factor=steering_values[4]):
+            return math.radians(carstate.angle)*0.5
+
+        steering_function = lambda index, offset: (self.alphas[index-offset]*carstate.distances_from_edge[index-offset] + self.alphas[index+offset]*carstate.distances_from_edge[index+offset])/(carstate.distances_from_edge[index+offset]+carstate.distances_from_edge[index-offset])
+
+        steer = steering_values[0]*self.alphas[alpha_index]
+        steer += steering_values[1]*steering_function(alpha_index, 1)
+        steer += steering_values[2]*steering_function(alpha_index, 2)
+        steer += steering_values[3]*steering_function(alpha_index, 3)
+        return steer
+
+
+    def speed_decider(self, carstate):
+        # we predict speed and map that to pedal
+        x_in = ffnn_speed.carstate_to_variable(carstate)
+        target_speed = self.speed(x_in).data[0]
+        pedal = 2/(1 + np.exp(carstate.speed_x - target_speed))-1
+        return pedal
+
+    def gear_decider(self, carstate):
+        gear = carstate.gear
+        rpm = carstate.rpm
+        # we do gears by hand
+        # up if {9500 9500 9500 9500 9000}
+        # down if {4000 6300 7000 7300 7300}
+        if gear == -1:
+            return 1
+        elif gear == 0:
+            if rpm >= 5000:
+                gear = 1
+        elif gear == 1:
+            if rpm >= 9500:
+                gear = 2
+        elif gear == 2:
+            if rpm >= 9500:
+                gear = 3
+            elif rpm <= 4000:
+                gear = 2
+        elif gear == 3:
+            if rpm >= 9500:
+                gear = 4
+            elif rpm <= 6300:
+                gear = 3
+        elif gear == 4:
+            if rpm >= 9500:
+                gear = 5
+            elif rpm <= 7000:
+                gear = 3
+        elif gear == 5:
+            if rpm >= 9000:
+                gear = 6
+            elif rpm <= 7300:
+                gear = 4
+        elif gear == 6:
+            if rpm <= 7300:
+                gear = 5
+
+        return gear
+
 
     def in_a_bad_place(self, carstate):
         something_wrong = False
@@ -69,6 +165,17 @@ class Final_Driver(Driver):
         if self.bad_counter >= 100:
             return True
         return False
+
+def is_straight_line(carstate, radians, factor):
+    if abs(carstate.distance_from_center) < 0.75:
+        if radians == 0:
+            return True
+        if carstate.distances_from_edge[9] > 190:
+            return True
+        if carstate.distances_from_edge[9] > factor * carstate.speed_x:
+            return True
+    return False
+
 
 def is_offroad(carstate):
     return max(carstate.distances_from_edge) == -1

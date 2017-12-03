@@ -16,7 +16,8 @@ class RNNMove(nn.Module):
         super(RNNMove, self).__init__()
         self.drop = nn.Dropout(dropout)
         nonlinearity = {'RNN_TANH': 'tanh', 'RNN_RELU': 'relu'}[rnn_type]
-        self.rnn = nn.RNN(input_dimension, hidden_dimension, nlayers, nonlinearity=nonlinearity, dropout=dropout)
+        self.encoder = nn.Linear(input_dimension, hidden_dimension)
+        self.rnn = nn.RNN(hidden_dimension, hidden_dimension, nlayers, nonlinearity=nonlinearity, dropout=dropout)
         self.decoder = nn.Linear(hidden_dimension, output_dimension)
 
         self.init_weights()
@@ -31,28 +32,14 @@ class RNNMove(nn.Module):
         self.decoder.weight.data.uniform_(-initrange, initrange)
 
     def forward(self, input, hidden):
-        output, hidden = self.rnn(input, hidden)
+        output = self.encoder(input).view(-1, 1)
+        output, hidden = self.rnn(output, hidden)
         output = self.drop(output)
         decoded = self.decoder(output.view(output.size(0)*output.size(1), output.size(2)))
         return decoded.view(output.size(0), output.size(1), decoded.size(1)), hidden
 
     def init_hidden(self, bsz):
         return nn.Parameter(torch.zeros(self.nlayers, bsz, self.hidden_dimension), requires_grad=True)
-
-def evaluate(model, data):
-	"""Evaluate a model on a data set."""
-	correct = 0.0
-
-	for y_true, state in data:
-		y_true = int(y_true[0])
-		lookup_tensor = Variable(torch.FloatTensor(state))
-		scores = model(lookup_tensor)
-		action = prediction_to_action(scores)
-
-		if action == y_true:
-			correct += 1
-
-	print("percent correct={}".format(correct/len(data)))
 
 def split_data_set(data_set, eval_perc=0.2):
 	total = len(data_set)
@@ -88,6 +75,7 @@ def create_model(out_file, training_folder, learning_rate, epochs, hidden_dimens
             optimizer.zero_grad()
 
             in_state = Variable(torch.FloatTensor(state))
+            print(in_state, hidden)
             y_pred, hidden = model(in_state, hidden)
             y_true = Variable(torch.FloatTensor(y_true))
 

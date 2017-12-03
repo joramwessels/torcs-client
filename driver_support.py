@@ -95,6 +95,42 @@ def read_lliaw_dataset_gear_gear_rpm_spe(filename: str) -> t.Iterable[t.Tuple[t.
             yield ([line_values[8]], [line_values[8], line_values[10]])
 
 
+def read_lliaw_dataset_speed_angle_dist_middle(filename: str) -> t.Iterable[t.Tuple[t.List[float], t.List[float]]]:
+    with open(filename, "r") as f:
+    	for line in f:
+            #   0     1     2      3      4             5              6       7    8    9
+			# accel break steer angle curLapTime distFromStartLine distRaced fuel gear racepos
+            # 10    11      12    13     14-32             33          34-59
+            # rpm speedx speedy speedz tracksensor1_19 distToMiddle oppSenso1_36
+            # y=speed, x=angle, distance*19, distToMiddle
+            line_values = [float(x) for x in line.strip().split(",")[:-1]]
+            yield ([line_values[11]], [line_values[3],
+                                     line_values[14], line_values[15], line_values[16],
+                                     line_values[17], line_values[18], line_values[19],
+                                     line_values[20], line_values[21], line_values[22],
+                                     line_values[23], line_values[24], line_values[25],
+                                     line_values[26], line_values[27], line_values[28],
+                                     line_values[29], line_values[30], line_values[31], line_values[32],
+                                     line_values[33]])
+
+def read_lliaw_dataset_steer_angle_speed_dist_middle(filename: str) -> t.Iterable[t.Tuple[t.List[float], t.List[float]]]:
+    with open(filename, "r") as f:
+    	for line in f:
+            #   0     1     2      3      4             5              6       7    8    9
+			# accel break steer angle curLapTime distFromStartLine distRaced fuel gear racepos
+            # 10    11      12    13     14-32             33          34-59
+            # rpm speedx speedy speedz tracksensor1_19 distToMiddle oppSenso1_36
+            # y=steer, x=angle, speed, distance*19, distToMiddle
+            line_values = [float(x) for x in line.strip().split(",")[:-1]]
+            yield ([line_values[2]], [line_values[3], line_values[11],
+                                     line_values[14], line_values[15], line_values[16],
+                                     line_values[17], line_values[18], line_values[19],
+                                     line_values[20], line_values[21], line_values[22],
+                                     line_values[23], line_values[24], line_values[25],
+                                     line_values[26], line_values[27], line_values[28],
+                                     line_values[29], line_values[30], line_values[31], line_values[32],
+                                     line_values[33]])
+
 def read_lliaw_dataset_acc_bre_steer_bunch(filename: str) -> t.Iterable[t.Tuple[t.List[float], t.List[float]]]:
     with open(filename, "r") as f:
     	for line in f:
