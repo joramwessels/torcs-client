@@ -45,6 +45,9 @@ class Final_Driver(Driver):
                     command.gear = -1
                 self.bad_counter = 200
         else:
+            # since the data and python's values differ we need to adjust them
+            carstate.angle = math.radians(carstate.angle)
+            carstate.speed_x = carstate.speed_x*3.6
             command = self.make_next_command(carstate)
             # based on target, implement speed/steering manually
         print("Executing command: gear={}, acc={}, break={}, steering={}".format(command.gear,
@@ -102,7 +105,13 @@ class Final_Driver(Driver):
         # we predict speed and map that to pedal
         x_in = ffnn_speed.carstate_to_variable(carstate)
         target_speed = self.speed(x_in).data[0]
+        # we limit the speed
+        if target_speed >= 120:
+            print(target_speed)
+            print(carstate.speed_x)
+            target_speed = 120
         pedal = 2/(1 + np.exp(carstate.speed_x - target_speed))-1
+        print(pedal)
         return pedal
 
     def gear_decider(self, carstate):
