@@ -57,16 +57,11 @@ To generate data call (it assumes linux and lliaw.cpp compiled with TORCS)
 
   python3.6 data_generator.py --drivers lliaw --tracks all --length 0 --laps 1 --file quickrace.xml
 
-<<<<<<< HEAD
 ## Data
 -  0     1     2      3      4             5              6       7    8    9
 - accel break steer angle curLapTime distFromStartLine distRaced fuel gear racepos
-- 10    11      12    13     14-22             23          24-49
+- 10    11      12    13     14-33             34          35-70
 - rpm speedx speedy speedz tracksensor1_19 distToMiddle oppSenso1_36
-=======
-Training data files in [train_single](ttps://github.com/joramwessels/torcs-client/tree/master/train_single) are ordered as follows:  
-accelCmd, brakeCmd, steerCmd, angle, curLapTime, distFromStartLine, distRaced, fuel, gear, racePos, engineRpm, speedX, speedY, speedZ, trackSensorOut (0-18), distToMiddle, oppSensorOut (0-35), 
->>>>>>> 0933f6cfbc0655f809d9774d124ffac503db3fee
 
 # Learning
 
