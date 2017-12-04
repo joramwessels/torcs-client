@@ -17,8 +17,8 @@ from torch.autograd import Variable
 
 learning_rate = 5e-7
 epochs = 10
-layers = 10
-units = 10
+layers = 100
+units = 100
 allow_cuda = True
 use_cuda = torch.cuda.is_available() and allow_cuda
 
@@ -144,7 +144,6 @@ def read_file(filename, tgt_ind, inp_ind, sep=',', skip_first_line=False):
             clean_line = line.strip().split(sep)
             if len(clean_line) > 1:
                 params = [float(s) for s in clean_line if not s == '']
-                #if not len(params) == 25: continue # TODO dynamify
                 x.append([params[i] for i in inp_ind])
                 y.append([params[i] for i in tgt_ind])
     x = Variable(torch.FloatTensor(x))
@@ -207,8 +206,6 @@ def normalize(x, y, metaparams):
     x_max[x_max==0] = 1     # division by zero
     for i in range(len(x)):
         for j in range(len(x[i])):
-            #x[i][j] = x[i][j] / x_max
-            #y[i][j] = y[i][j] / y_max
             x[i][j] = torch.div(x[i][j], x_max)
             y[i][j] = torch.div(y[i][j], y_max)
     return x, y
@@ -246,10 +243,10 @@ def main(folder, save_as, targets, inputs):
     return model
 
 if __name__ == "__main__":
-    # targets: accelCmd, brakeCmd, steerCmd
-    targets = [0, 1, 2]
-    # inputs: angle, gear, speed(X-Z), trackSens(0-18), distToMiddle
-    inputs = [3, 8] + list(range(11, 34))
+    # targets: accelCmd, brakeCmd, steerCmd, gear
+    targets = [0, 1, 2, 8]
+    # inputs: angle, speed(X-Z), trackSens(0-18), distToMiddle
+    inputs = [3] + list(range(11, 24))
     model = main(sys.argv[1], sys.argv[2], targets, inputs)
 
-data_filename = "C:/Users/Joram/Documents/Studie/torcs-client/train_single/"
+data_folder = "C:/Users/Joram/Documents/Studie/torcs-client/train_single/"
