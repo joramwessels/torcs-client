@@ -1,1 +1,1 @@
-start_ffnn_2_pred.sh
+start_ffnn.sh
