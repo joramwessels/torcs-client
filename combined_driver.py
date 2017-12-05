@@ -16,7 +16,7 @@ import ffnn_speed
 
 class Final_Driver(Driver):
 
-    def __init__(self):
+    def __init__(self, steering_values, global_max_speed):
         super(Final_Driver, self).__init__()
         self.steer = ffnn_steer.Steer(10)
         self.steer.load_state_dict(torch.load("./steer.data"))
@@ -29,6 +29,8 @@ class Final_Driver(Driver):
         self.angles = [90, 75, 60, 45, 30, 20, 15, 10, 5, 0, -5, -10, -15, -20, -30, -45, -60, -75, -90]
         self.alphas = [math.radians(x) for x in self.angles]
         self.last_opponents = [0 for x in range(36)]
+        self.steering_values = steering_values
+        self.global_max_speed = global_max_speed
 
     def update_trackers(self, carstate):
         if carstate.laptime == 0:
@@ -65,16 +67,16 @@ class Final_Driver(Driver):
         # we switch gears manually
         gear = self.gear_decider(carstate)
         # we get the steering prediction
-        steer_pred = self.steer_decider(carstate, [0.21, 1.56, 0.68, 0.53, 1.25])
+        steer_pred = self.steer_decider(carstate, steering_values=self.steering_values)
         # steer_pred = self.steer_decider_nn(carstate)
         # pedal =[-1;1], combining breaking and accelerating to one variable
-        pedal = self.speed_decider(carstate)
+        pedal = self.speed_decider(carstate, max_speed=self.global_max_speed)
 
         # make sure we don't drive at people
         opponents_deltas = list(map(sub, carstate.opponents, self.last_opponents))
         steer_pred, pedal = self.deal_with_opponents(steer_pred, pedal, carstate.speed_x, carstate.distance_from_center, carstate.opponents, opponents_deltas)
         # disambiguate pedal with smoothing
-        brake, accel = self.disambiguate_pedal(pedal, accel_cap=0.5, break_cap=0.75, break_max_length=5)
+        brake, accel = self.disambiguate_pedal(pedal, accel_cap=1.0, break_cap=0.75, break_max_length=5)
 
         command.brake = brake
         command.accelerator = accel
@@ -85,7 +87,7 @@ class Final_Driver(Driver):
     def deal_with_opponents(self, steer_pred, pedal, speed, distance_from_center, opponents_new, opponents_delta):
         # index 18 is in front
         # index 35 in behind us
-        adjustment = 0.2
+        adjustment = 0.1
         # if there are cars infront-left -> move to right
         if opponents_new[17] < 10 or opponents_new[16] < 10 or opponents_new[15] < 10:
             print("ADJUSTING SO NOT TO HIT")
@@ -123,11 +125,6 @@ class Final_Driver(Driver):
             accelerator = 0
         return brake, accelerator
 
-    # def steer_decider_nn(self, carstate):
-    #     x_in = ffnn_steer.carstate_to_variable(carstate)
-    #     steer_pred = self.steer(x_in).data[0]
-    #     return steer_pred
-
     def steer_decider(self, carstate, steering_values):
         alpha_index = np.argmax(carstate.distances_from_edge)
         if is_straight_line(carstate=carstate, radians=self.alphas[alpha_index], factor=steering_values[4]):
@@ -136,19 +133,19 @@ class Final_Driver(Driver):
         steering_function = lambda index, offset: (self.alphas[index-offset]*carstate.distances_from_edge[index-offset] + self.alphas[index+offset]*carstate.distances_from_edge[index+offset])/(carstate.distances_from_edge[index+offset]+carstate.distances_from_edge[index-offset])
 
         steer = steering_values[0]*self.alphas[alpha_index]
-        steer += steering_values[1]*steering_function(alpha_index, 1)
-        steer += steering_values[2]*steering_function(alpha_index, 2)
-        steer += steering_values[3]*steering_function(alpha_index, 3)
+        for x in range(1, 4):
+            if alpha_index - x > -1 and alpha_index + x < len(steering_values):
+                steer += steering_values[x]*steering_function(alpha_index, x)
         return steer
 
 
-    def speed_decider(self, carstate):
+    def speed_decider(self, carstate, max_speed=120):
         # we predict speed and map that to pedal
         x_in = ffnn_speed.carstate_to_variable(carstate)
         target_speed = self.speed(x_in).data[0]
         # we limit the speed
-        if target_speed >= 120:
-            target_speed = 120
+        if target_speed >= max_speed:
+            target_speed = max_speed
         pedal = 2/(1 + np.exp(carstate.speed_x - target_speed))-1
         return pedal
 
