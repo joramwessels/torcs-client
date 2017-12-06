@@ -17,8 +17,8 @@ from torch.autograd import Variable
 
 learning_rate = 5e-7
 epochs = 10
-layers = 100
-units = 100
+layers = 10
+units = 10
 allow_cuda = True
 use_cuda = torch.cuda.is_available() and allow_cuda
 
@@ -56,10 +56,10 @@ class MLP(torch.nn.Module):
         
         """
         h = self.input_layer(x)
-        h = self.sigmoid(h)
+        #h = self.sigmoid(h)
         for _ in range(self.layers-1):
             h = self.hidden_layer(h)
-            h = self.sigmoid(h)
+            #h = self.sigmoid(h)
         y_pred = self.output_layer(h)
         return y_pred.cuda() if use_cuda else y_pred
     
@@ -226,27 +226,36 @@ def find_max(x):
     max_v = torch.max(x_max, 0)[0]
     return max_v
 
+def test_on_train_set(model, x, max_pred=500):
+    """
+    """
+    for i in range(min(len(x), max_pred)):
+        pred_y = list(model.predict(list(x[i].data)).data)
+        print(i,"acc: %.2f, brk: %.2f, ste: %.2f, gea: %.2f"
+                %(pred_y[0], pred_y[1], pred_y[2], pred_y[3]), end='\n')
+
 def main(folder, save_as, targets, inputs):
     x, y = read_all_files(folder, targets, inputs)
     print("Read %i batches" %len(x))
     metaparams = {'d_inp':len(x[0][0]), 'd_hid':units,
                   'd_out':len(y[0][0]), 'layers':layers,
                   'x_max':find_max(x), 'y_max':find_max(y)}
+    print("Normalizing data...")
     x, y = normalize(x, y, metaparams)
-    print("Datasets normalized")
     model = train_model(x, y, metaparams)
     print("Trained model for %i epochs" %epochs)
     # Always save as CPU model, cast to CUDA while loading if required
     torch.save(metaparams, save_as + ".meta")
     torch.save(model.float().state_dict(), save_as)
     print("Model saved as",save_as)
+    test_on_train_set(model, x[0])
     return model
 
 if __name__ == "__main__":
     # targets: accelCmd, brakeCmd, steerCmd, gear
     targets = [0, 1, 2, 8]
     # inputs: angle, speed(X-Z), trackSens(0-18), distToMiddle
-    inputs = [3] + list(range(11, 24))
+    inputs = [3] + list(range(14, 24))
     model = main(sys.argv[1], sys.argv[2], targets, inputs)
 
 data_folder = "C:/Users/Joram/Documents/Studie/torcs-client/train_single/"
