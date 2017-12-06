@@ -46,19 +46,23 @@ class GRU(nn.Module):
         super(GRU, self).__init__()
         self.n_layers = n_layers
         self.h_dim = h_dim
-        self.hidden_layer = nn.GRU(i_dim, h_dim)
+        self.input_layer = nn.Linear(i_dim, h_dim)
+        self.hidden_layer = nn.GRU(i_dim, h_dim, n_layers, batch_first=True)
         self.output_layer = nn.Linear(h_dim, o_dim)
 
     def forward(self, input, hidden):
-        print(input)
+        #input = input.view(1, 1, -1)
+        #output = self.input_layer(input)
+        #for i in range(self.n_layers):
+        #    output, hidden = self.hidden_layer(output, hidden)
+        print(input.size())
+        print(hidden.size())
         output, hidden = self.hidden_layer(input, hidden)
-        for i in range(self.n_layers):
-            output, hidden = self.hidden_layer(output, hidden)
         output = self.output_layer(output)
         return output, hidden
 
     def initHidden(self):
-        result = Variable(torch.zeros(1, 1, self.h_dim))
+        result = Variable(torch.zeros(self.n_layers, 1, self.h_dim))
         if use_cuda:
             return result.cuda()
         else:
@@ -77,8 +81,10 @@ def train(input, target, encoder, optimizer, criterion):
     hidden = encoder.initHidden()
     optimizer.zero_grad()
     loss = 0
-    for i in range(len(input)):
-        output, hidden = encoder(input[i], hidden)
+    #for i in range(len(input)):
+    #    output, hidden = encoder(input[i], hidden)
+    #    loss += criterion(output, target)
+    output, hidden = encoder(input, hidden)
     loss = criterion(output, target)
     loss.backward()
     optimizer.step()
@@ -160,19 +166,22 @@ def readTrainingData(filename, target_indices, sep, skip_first_line):
     skip_first_line:    Boolean indicating labels on the first line of the CSV
 
     """
-    training_pairs = [[]]
+    inputs = []
+    targets = []
     with open(filename) as file:
         if skip_first_line: next(file)
         for line in file:
             params = [float(s) for s in line.strip().split(sep)]
-            inputs  = Variable(torch.FloatTensor(params))
-            targets = [params[i] for i in target_indices]
-            targets = Variable(torch.FloatTensor(targets))
-            if use_cuda:
-                training_pairs[0].append((inputs.cuda(), targets.cuda()))
-            else:
-                training_pairs[0].append((inputs, targets))
-    return training_pairs
+            if not len(params) == 25: continue
+            inputs.append(params)
+            targets.append([params[i] for i in target_indices])
+    if use_cuda:
+        inputs = Variable(torch.FloatTensor([inputs])).cuda()
+        targets = Variable(torch.FloatTensor([targets])).cuda()
+    else:
+        inputs = Variable(torch.FloatTensor([inputs]))
+        targets = Variable(torch.FloatTensor([targets]))
+    return [(inputs, targets)]
 
 if __name__ == "__main__":
     train_gru_on(sys.argv[1], [0,1,2], sys.argv[2], sep=',', skip_first_line=True)
