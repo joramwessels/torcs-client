@@ -33,12 +33,13 @@ class Final_Driver(Driver):
         self.global_max_speed = global_max_speed
 
     def update_trackers(self, carstate):
-        if carstate.laptime == 0:
+        if carstate.current_lap_time == 0:
             self.lap_counter += 1
             print("Lap={}".format(self.lap_counter))
+        print("distance:",carstate.distance_raced)
 
     def drive(self, carstate: State) -> Command:
-
+        self.update_trackers(carstate)
         if self.in_a_bad_place(carstate):
             command = self.back_up_driver.drive(carstate)
             if self.bad_counter >= 600 and is_stuck(carstate):
