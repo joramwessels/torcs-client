@@ -171,21 +171,24 @@ def read_all_files(folder, tgt_ind, inp_ind):
             ys.append(y)
     return xs, ys
 
-def load_model(filename):
+def load_model(filename, cuda=False):
     """ Loads a model from just the filename
 
     Args:
         filename:   The name of the save file
+        cuda:       Set to True to make predictions use CUDA
 
     Returns:
         model
 
     """
+    global use_cuda
+    use_cuda = cuda
     metaparams = torch.load(filename + ".meta")
     model = MLP(metaparams['d_inp'], metaparams['d_hid'],
                 metaparams['d_out'], metaparams['layers'],
                 metaparams['x_max'], metaparams['y_max'])
-    model.load_state_dict(torch.load(filename))
+    model.load_state_dict(torch.load(filename, map_location=lambda storage, loc: storage))
     return model.cuda() if use_cuda else model
 
 def normalize(x, y, metaparams):
