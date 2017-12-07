@@ -40,17 +40,18 @@ def mutate_random(gene, ranges, mutation_probability=0.1):
 
 def evaluate(gene):
     evaluation = -99999999
-    gene = [0.21, 1.56, 0.68, 0.53, 1.25, 160]
     print(gene)
-    try:
-        client, server = run_torcs.run_on_all_tracks('scr_server', steering_values=gene[:5], max_speed=gene[5], timeout=5)
-        for line in server:
-            print(line)
-        for line in client:
-            print(line)
-    except TimeoutError as e:
-        pass
-    print("done!")
+    client, server = run_torcs.run_on_ea_tracks('scr_server', steering_values=gene[:5], max_speed=gene[5], timeout=5)
+    time = []
+    distance = []
+    for track in client:
+        distance.append(run_torcs.get_distance_covered(track))
+        time.append(run_torcs.get_total_time_covered(track))
+    print(time)
+    print(distance)
+
+    evaluation = sum(list(map((lambda x, y: x/y), distance, time)))/len(client)
+    print("done!", evaluation)
     return evaluation
 
 def select(population, evaluations, count):
@@ -68,11 +69,13 @@ def get_random_gene(ranges):
         gene.append(np.random.uniform(low, high))
     return gene
 
-def terminate(evaluation):
+def terminate(evaluation, generation):
     maximum = max(evaluation)
     average = sum(evaluation)/len(evaluation)
     print_evalution(maximum, average, min(evaluation))
-    if maximum - average <= 50:
+    if generation > 100:
+        return True
+    if maximum - average <= 1:
         return True
     else:
         return False
@@ -91,7 +94,8 @@ def main(population_size, ranges):
     print("starting evaluation:", evaluation)
 
     survivor_count = 5
-    while not terminate(evaluation):
+    generation = 1
+    while not terminate(evaluation, generation):
         survivors = select(population=population, evaluations=evaluation, count=survivor_count)
         population = []
         for survivor in survivors:
@@ -105,7 +109,8 @@ def main(population_size, ranges):
                         changed = True
                 population.append(new_gene)
         evaluation = [evaluate(gene) for gene in population]
+        generation += 1
 
 
 if __name__ == "__main__":
-    main(1, ranges)
+    main(20, ranges)
