@@ -14,16 +14,18 @@
 # 
 
 from collections import defaultdict
+from numbers import Real
 import numpy as np
 
-SEP = ','
-NAME = '.feromones'
+SEP = ','            # the separator used in the feromone trail files
+NAME = '.feromones'  # the basic filename for feromone trail files
+NOMAX = 10000        # returned when an error occurs
 
-# - TODO unit test: to_index, to_speed, back_prop, report_result, check_in
-# - TODO write: breakable_speed
+# - TODO unit test: back_prop, report_result, check_in
 # - TODO if track is known, or if feromone trail looks like a known track, switch to known trail
 # - NOTE if they drive close behind each other, they'll always explore the same max_speeds
 # - NOTE initializing a FeromoneTrail will not read the previous .feromone entries
+# - NOTE back_prop will stop at the finish line, since the length of the track isn't known
 
 class FeromoneTrail:
 
@@ -33,21 +35,23 @@ class FeromoneTrail:
 
         A FeromoneTrail contains a table of known feromones and syncs to
         a .feromone file in storage to communicate with the swarm. The
-        initialization requires a position interval in game cycles at
-        which to check and update the feromone trail, a grid of possible
+        initialization requires a position interval in meters at which
+        to check and update the feromone trail, a grid of possible
         max_speed values to explore, an exploration interval to increase
         the max_speed with when no negative experiences are known, and
         a global maximum speed to default to when there are no positive
         experiences. The resulting max_speeds can be lower than the
         global maximum when this speed resulted in a negative experience.
+        Make sure to choose your speed grid big enough to harbor any speed
+        category you want to learn.
 
         Args:
-            pos_int:    The interval at which to check feromones (int)
-            spd_int:    The interval between speed boxes (int)
-            spd0:       The first speed box (int)
+            pos_int:    The interval at which to check feromones in m (int)
+            spd_int:    The interval between speed boxes in km/h (int)
+            spd0:       The first speed box in km/h (int)
             spd_n:      The amount of speed boxes (int)
-            expl_int:   The jump interval when no - values are known (int)
-            glb_max:    The global max speed that ensures a finish (int)
+            expl_int:   The jump interval (dividable by spd_int) in km/h (int)
+            glb_max:    The global max speed that ensures a finish in km/h (int)
             track_id:   The name of the race track if known
 
         """
@@ -55,7 +59,7 @@ class FeromoneTrail:
         self.spd_int = spd_int
         self.spd0 = spd0
         self.spd_n = spd_n
-        self.spd_max = spd0 + spd_n * spd_int
+        self.spd_max = (spd0 + spd_n * spd_int) - spd_int
         self.expl_int = expl_int
         self.glb_max = glb_max
         self.prev_pos = 0
@@ -72,10 +76,11 @@ class FeromoneTrail:
         """ Casts the feromone trail table to a string representation """
         i = 0
         speeds = [str(self.to_speed(i)) for i in range(self.spd_n)]
-        string = "\t " + ' '.join(speeds) + '\n'
+        string = "\t " + ' '.join(speeds) + " km/h" + '\n'
         while str(i) in self.table:
             string += str(i) + ':\t' + str(self.table[str(i)]) + '\n'
             i += self.pos_int
+        string += "m\n"
         return string
 
     def to_index(self, spd):
@@ -85,6 +90,10 @@ class FeromoneTrail:
     def to_speed(self, ind):
         """ Converts table index to absolute speed """
         return self.spd0 + ind * self.spd_int
+
+    def is_on_grid(self, spd):
+        """ Returns True if speed value is on the speed grid """
+        return not (spd < self.spd0) or (spd > self.spd_max)
 
     def write_feromone(self, pos, speed, val):
         """ Writes a new feromone to the .feromone file
@@ -131,7 +140,12 @@ class FeromoneTrail:
 
         """
         index = self.to_index(spd)
-        self.table[str(pos)][index] = val
+        if val == -1:
+            for i in range(index, self.to_index(self.spd_max) +1):
+                self.table[str(pos)][i] = -1
+        elif val == 1:
+            for i in range(index, -1, -1):
+                self.table[str(pos)][i] = 1
 
     def next_experiment(self, pos):
         """ Checks the table for the next best max speed experiment
@@ -190,13 +204,13 @@ class FeromoneTrail:
             max_spd:    The max speed that has failed (int)
         
         """
-        while max_spd < self.spd_max:
+        while max_spd < self.spd_max and pos > -1:
             first_minus = find_first(self.table[str(pos)], -1)
-            if self.to_index(max_spd) >= first_minus:
+            if self.to_index(max_spd) >= first_minus and first_minus > -1:
                 break
             self.leave_feromone(pos, max_spd, -1)
-            max_spd = breakable_speed(max_spd, self.pos_int)
-            max_spd -= max_spd % self.spd_int
+            max_spd = int(breakable_speed(max_spd, self.pos_int))
+            max_spd -= int(max_spd % self.spd_int)
             pos -= self.pos_int
 
     def get_max_speed(self, pos):
@@ -228,11 +242,12 @@ class FeromoneTrail:
 
         Args:
             pos:    The position on the track, CurLapTime (int)
-            spd:    The current speed of the car (float)
+            spd:    The current speed of the car (int)
             val:    The result of the experiment (-1, 0, 1)
 
         """
-        max_spd = int(spd - (spd % self.spd_int) + self.spd_int)
+        spd -= 1  # such that 160 falls into the category with max_spd=160
+        max_spd = spd - (spd % self.spd_int) + self.spd_int
         spd_i = self.to_index(max_spd)
         if val == -1:
             self.back_prop(pos, max_spd)
@@ -243,8 +258,8 @@ class FeromoneTrail:
         """ Called at the start of ever frame to check/update feromones
 
         Args:
-            pos:        The position on the track, CurLapTime (int)
-            spd:        The current speed of the car (float)
+            pos:        The position on the track, distTraveled in m (num)
+            spd:        The current speed of the car in km/h (num)
             crashed:    Indicates a crash or off-track in last frame (bool)
             contact:    Indicates contact with another car in last frame (bool)
         
@@ -252,19 +267,34 @@ class FeromoneTrail:
             The maximum speed for the next frame according to the swarm
         
         """
-        assert type(pos) is int, "SWARM WARNING: type(pos) = "+str(type(pos))
+
+        # input verification
+        if not isinstance(pos, Real):
+            print("SWARM ERROR: pos isn't a real number, but:", pos)
+            return NOMAX
+        if not isinstance(spd, Real):
+            print("SWARM ERROR: spd isn't a real number, but:", pos)
+            return NOMAX
+        if spd > self.spd_max:
+            print("SWARM WARNING: Speed is beyond speed grid:",spd)
+            print("               Swarm can't learn from this experience")
         if not pos % self.pos_int == 0:
             print("SWARM WARNING: Invalid position:",pos)
             pos -= pos % self.pos_int
-            print("               Defaulted to",pos)
-        assert type(spd) is float, "SWARM WARNING: type(spd) = "+str(type(spd))
+            print("               Defaulted to:    ",pos)
+        pos, spd = int(pos), int(spd)
 
-        if crashed and not contact:
-            self.report_result(self.prev_pos, self.prev_spd, -1)
-        elif not crashed and not contact:
-            self.report_result(self.prev_pos, self.prev_spd, 1)
+        # update
+        if self.is_on_grid(self.prev_spd):
+            if crashed and not contact:
+                self.report_result(self.prev_pos, self.prev_spd, -1)
+            elif not crashed and not contact:
+                self.report_result(self.prev_pos, self.prev_spd, 1)
+        
+        # predict
         self.prev_pos, self.prev_spd = pos, spd
         max_speed = self.get_max_speed(pos)
+
         return max_speed
 
 def find_first(array, val, rev=False):
@@ -294,15 +324,19 @@ def breakable_speed(end_speed, trajectory):
     """ Computes the max speed that can break to reach *end_speed*
 
     Args:
-        end_speed:  The speed after maximum desceleration
-        trajectory: The distance over which to descelerate
+        end_speed:  The speed at the end of the trajectory in km/h (num)
+        trajectory: The distance over which to descelerate in m (num)
     
     Returns:
         The maximum absolute speed at the beginning of the
-        trajectory that allows a desceleration to *end_speed*
+        trajectory that ensures a desceleration to *end_speed*
     
     """
-    return # TODO
+    # The car is about 5m long, it descelerated from 280 to 0
+    # in about 12-14 times its length, which would be 60-70m.
+    # Assuming a linear decrease in speed, the maximum rate
+    # of desceleration is therefore -280/65 = -4.31 km/h/m.
+    return trajectory * 4.31 + end_speed
 
 """
 import swarm

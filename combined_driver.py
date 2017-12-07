@@ -6,6 +6,18 @@ import driver_support
 from operator import sub
 
 from basic_control import BasicControl
+from swarm import FeromoneTrail
+
+# - NOTE crash detection for swarm only checks for off road
+# - NOTE collision detection for swarm might be too sensitive
+# - TODO clear up swarm global parameters
+
+# swarm metaparameters
+swarm_pos_int  = 20
+swarm_spd_int  = 10
+swarm_spd0     = 100
+swarm_spd_n    = 30
+swarm_expl_int = 50
 
 class Final_Driver(Driver):
 
@@ -17,7 +29,15 @@ class Final_Driver(Driver):
         self.lap_counter = 0
         self.last_opponents = [0 for x in range(36)]
         self.global_max_speed = global_max_speed
+        self.max_speed = global_max_speed
         self.cummulative_time = 0
+        self.swarm = FeromoneTrail(
+            swarm_pos_int, swarm_spd_int,
+            swarm_spd0,    swarm_spd_n,
+            swarm_expl_int, global_max_speed)
+        self.crashed_in_last_frame = False
+        self.contact_in_last_frame = False
+        self.previous_frame_position = 0
 
     def update_trackers(self, carstate):
         print(carstate.current_lap_time)
@@ -30,6 +50,15 @@ class Final_Driver(Driver):
 
     def drive(self, carstate: State) -> Command:
         self.update_trackers(carstate)
+
+        # crash and collision detection for swarm
+        if is_offroad(carstate):
+            self.crashed_in_last_frame = True
+        for dist in carstate.opponents:
+            if dist == 0:
+                self.contact_in_last_frame = True
+
+        # bad state detection
         if in_a_bad_place(carstate, self.bad_counter):
             command = self.back_up_driver.drive(carstate)
             if self.bad_counter >= 600 and is_stuck(carstate):
@@ -68,9 +97,20 @@ class Final_Driver(Driver):
         gear = self.basic_control.gear_decider(carstate)
         # we get the steering prediction
         steer_pred = self.basic_control.steer_decider(carstate)
-        # steer_pred = basic_control.steer_decider_nn(carstate)
-        # pedal =[-1;1], combining breaking and accelerating to one variable
-        pedal = self.basic_control.speed_decider(carstate, max_speed=self.global_max_speed)
+        # checking in on the swarm
+        position = carstate.distance_from_start
+        if position > self.previous_frame_position + self.swarm.pos_int:
+            position = int(position - (position % self.swarm.pos_int))
+            self.max_speed = self.swarm.check_in(
+                                        position,
+                                        carstate.speed_x,
+                                        self.crashed_in_last_frame,
+                                        self.contact_in_last_frame)
+            self.crashed_in_last_frame = False
+            self.contact_in_last_frame = False
+            self.previous_frame_position = position
+        
+        pedal = self.basic_control.speed_decider(carstate, max_speed=self.max_speed)
 
         # make sure we don't drive at people
         opponents_deltas = list(map(sub, carstate.opponents, self.last_opponents))
