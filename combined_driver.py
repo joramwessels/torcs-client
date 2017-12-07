@@ -17,12 +17,16 @@ class Final_Driver(Driver):
         self.lap_counter = 0
         self.last_opponents = [0 for x in range(36)]
         self.global_max_speed = global_max_speed
+        self.cummulative_time = 0
 
     def update_trackers(self, carstate):
-        if carstate.current_lap_time == 0:
+        print(carstate.current_lap_time)
+        if abs(carstate.current_lap_time) < 0.020:
             self.lap_counter += 1
             print("Lap={}".format(self.lap_counter))
-        print("distance:",carstate.distance_raced)
+            self.cummulative_time += carstate.last_lap_time + self.cummulative_time
+        print("distance={}".format(carstate.distance_raced))
+        print("time={}".format(self.cummulative_time + carstate.current_lap_time))
 
     def drive(self, carstate: State) -> Command:
         self.update_trackers(carstate)
@@ -53,10 +57,10 @@ class Final_Driver(Driver):
 
         Args:
             carstate:   The full carstate object as passed to Driver()
-        
+
         Returns:
             command:    The command object to pass back to the server
-        
+
         """
         command = Command()
 
@@ -91,10 +95,10 @@ def in_a_bad_place(carstate, bad_counter):
     Args:
         carstate:       The full carstate object
         bad_counter:    ???
-    
+
     Returns:
         A boolean indicating whether the car is having troubles
-    
+
     """
     something_wrong = False
     if is_offroad(carstate):
