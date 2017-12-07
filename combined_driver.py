@@ -15,7 +15,7 @@ from operator import sub
 
 from basic_control import BasicControl
 from swarm import FeromoneTrail
-from crisis_driver import CrisisDriver
+from crisis_driver import CrisisDriver, car_is_stuck
 
 # - NOTE crash detection for swarm only checks for off road
 # - NOTE collision detection for swarm might be too sensitive
@@ -25,6 +25,9 @@ from crisis_driver import CrisisDriver
 PRINT_CYCLE_INTERVAL = 100 # freqency of print output in game cycles
 PRINT_STATE = True
 PRINT_COMMAND = False
+
+ENABLE_SWARM = False
+ENABLE_CRISIS_DRIVER = False
 
 # swarm metaparameters
 swarm_pos_int  = 20
@@ -56,13 +59,15 @@ class Final_Driver(Driver):
         self.global_max_speed = global_max_speed
         self.max_speed = global_max_speed
         self.cummulative_time = 0
-        self.swarm = FeromoneTrail(
-            swarm_pos_int, swarm_spd_int,
-            swarm_spd0,    swarm_spd_n,
-            swarm_expl_int, self.global_max_speed)
-        self.crashed_in_last_frame = False
-        self.contact_in_last_frame = False
-        self.previous_frame_position = 0
+        if ENABLE_SWARM:
+            self.swarm = FeromoneTrail(
+                swarm_pos_int, swarm_spd_int,
+                swarm_spd0,    swarm_spd_n,
+                swarm_expl_int, self.global_max_speed)
+            self.crashed_in_last_frame = False
+            self.contact_in_last_frame = False
+            self.previous_frame_position = 0
+            self.previous_frame_lap = 0
 
     def drive(self, carstate: State) -> Command:
         """ Description
@@ -88,8 +93,12 @@ class Final_Driver(Driver):
                 self.contact_in_last_frame = True
         
         # crisis handling
-        #if self.back_up_driver.is_in_control:
-        #    return self.back_up_driver.drive(carstate)
+        if ENABLE_CRISIS_DRIVER:
+            if self.back_up_driver.is_in_control:
+                return self.back_up_driver.drive(carstate)
+            elif car_is_stuck():
+                self.back_up_driver.pass_control(carstate)
+                return self.back_up_driver.drive(carstate)
 
         # bad place detection
         if in_a_bad_place(carstate, self.bad_counter):
@@ -133,7 +142,9 @@ class Final_Driver(Driver):
         steer_pred = self.basic_control.steer_decider(carstate)
         # checking in on the swarm
         position = carstate.distance_from_start
-        if position > self.previous_frame_position + self.swarm.pos_int:
+        new_frame = position > (self.previous_frame_position + self.swarm.pos_int)
+        new_lap = self.lap_counter > self.previous_frame_lap
+        if ENABLE_SWARM and (new_frame or new_lap):
             position = int(position - (position % self.swarm.pos_int))
             self.max_speed = self.swarm.check_in(
                                         position,
@@ -141,6 +152,8 @@ class Final_Driver(Driver):
                                         self.crashed_in_last_frame,
                                         self.contact_in_last_frame)
             err("Swarm: position=%i, max_speed=%i" %(position, self.max_speed))
+            if new_lap:
+                self.previous_frame_lap = self.lap_counter
             self.crashed_in_last_frame = False
             self.contact_in_last_frame = False
             self.previous_frame_position = position
