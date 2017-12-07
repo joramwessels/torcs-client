@@ -1,14 +1,8 @@
 from pytocl.driver import Driver
 from pytocl.car import State, Command
-import torch
 import time
-import sys
-import numpy as np
 from math import radians
-from os import listdir
-from os.path import isfile, join
 import driver_support
-from torch.autograd import Variable
 from operator import sub
 
 from basic_control import BasicControl
