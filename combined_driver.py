@@ -45,6 +45,9 @@ class Final_Driver(Driver):
             self.lap_counter += 1
             print("Lap={}".format(self.lap_counter))
             self.cummulative_time += carstate.last_lap_time + self.cummulative_time
+
+        print(carstate.angle)
+        print(carstate.distance_from_center)
         print("distance={}".format(carstate.distance_raced))
         print("time={}".format(self.cummulative_time + carstate.current_lap_time))
 
@@ -100,6 +103,7 @@ class Final_Driver(Driver):
         # checking in on the swarm
         position = carstate.distance_from_start
         if position > self.previous_frame_position + self.swarm.pos_int:
+            print(position, self.previous_frame_position)
             position = int(position - (position % self.swarm.pos_int))
             self.max_speed = self.swarm.check_in(
                                         position,
@@ -109,7 +113,7 @@ class Final_Driver(Driver):
             self.crashed_in_last_frame = False
             self.contact_in_last_frame = False
             self.previous_frame_position = position
-        
+
         pedal = self.basic_control.speed_decider(carstate, max_speed=self.max_speed)
 
         # make sure we don't drive at people

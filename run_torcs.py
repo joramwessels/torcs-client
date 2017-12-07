@@ -6,7 +6,6 @@ from pytocl.main import main
 from combined_driver import Final_Driver
 import os
 import signal
-import time
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--drivers', nargs='+', type=str)
@@ -64,9 +63,7 @@ def write_and_run(tree, track, steering_values, max_speed, timeout, port):
     command = "./run_evaluation.sh '{}' {} {} {}".format(steering_values, max_speed, timeout, port)
     #["./run_evaluation.sh", steering_values, str(max_speed), str(timeout)]
     completed_command = subprocess.run(command, shell=True, check=False, stdout=subprocess.PIPE)
-    time.sleep(2)
     pids = list(completed_command.stdout.decode("utf-8").strip().split())
-    print(pids)
     try:
         os.kill(pid[0], signal.SIGINT)
     except:
@@ -114,7 +111,6 @@ def run_on_tracks(driver, tracks, steering_values, max_speed, timeout):
         if base_port + port_offset > 3009:
             port_offset = 0
 
-    print(server)
     return client, server
 
 def get_distance_covered(client_out):
@@ -123,8 +119,6 @@ def get_distance_covered(client_out):
         if "distance" in client_out[index]:
             distance = int(float(client_out[index].strip().split("=")[1]))
             break
-    if distance == -1:
-        print(client_out)
     return distance
 
 def get_total_time_covered(client_out):
