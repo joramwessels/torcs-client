@@ -13,6 +13,7 @@
 #           crashed, contact = False, False
 # 
 
+from sys import stderr
 from collections import defaultdict
 from numbers import Real
 import numpy as np
@@ -55,13 +56,13 @@ class FeromoneTrail:
             track_id:   The name of the race track if known
 
         """
-        self.pos_int = pos_int
-        self.spd_int = spd_int
-        self.spd0 = spd0
-        self.spd_n = spd_n
+        self.pos_int = int(pos_int)
+        self.spd_int = int(spd_int)
+        self.spd0 = int(spd0)
+        self.spd_n = int(spd_n)
         self.spd_max = (spd0 + spd_n * spd_int) - spd_int
-        self.expl_int = expl_int
-        self.glb_max = glb_max
+        self.expl_int = int(expl_int)
+        self.glb_max = int(glb_max)
         self.prev_pos = 0
         self.prev_spd = 0
         self.filename = NAME + '_' + track_id if track_id else NAME
@@ -85,7 +86,7 @@ class FeromoneTrail:
 
     def to_index(self, spd):
         """ Converts absolute speed to table index """
-        return (spd - self.spd0) // self.spd_int
+        return int((spd - self.spd0) // self.spd_int)
 
     def to_speed(self, ind):
         """ Converts table index to absolute speed """
@@ -227,9 +228,9 @@ class FeromoneTrail:
         
         """
         if not pos % self.pos_int == 0:
-            print("SWARM WARNING: Invalid position:",pos)
+            err("SWARM WARNING: Invalid position:", pos)
             pos += self.pos_int - (pos % self.pos_int)
-            print("               Defaulted to",pos)
+            err("               Defaulted to", pos)
         change = self.read_feromone()
         while change:
             ppos, speed, val = change.pop()
@@ -270,18 +271,18 @@ class FeromoneTrail:
 
         # input verification
         if not isinstance(pos, Real):
-            print("SWARM ERROR: pos isn't a real number, but:", pos)
+            err("SWARM ERROR: pos isn't a real number, but:", pos)
             return NOMAX
         if not isinstance(spd, Real):
-            print("SWARM ERROR: spd isn't a real number, but:", pos)
+            err("SWARM ERROR: spd isn't a real number, but:", pos)
             return NOMAX
         if spd > self.spd_max:
-            print("SWARM WARNING: Speed is beyond speed grid:",spd)
-            print("               Swarm can't learn from this experience")
+            err("SWARM WARNING: Speed is beyond speed grid:", spd)
+            err("               Swarm can't learn from this experience")
         if not pos % self.pos_int == 0:
-            print("SWARM WARNING: Invalid position:",pos)
+            err("SWARM WARNING: Invalid position:", pos)
             pos -= pos % self.pos_int
-            print("               Defaulted to:    ",pos)
+            err("               Defaulted to:    ", pos)
         pos, spd = int(pos), int(spd)
 
         # update
@@ -296,6 +297,10 @@ class FeromoneTrail:
         max_speed = self.get_max_speed(pos)
 
         return max_speed
+
+def err(*args):
+    """ prints to standard error """
+    print(*args, file=stderr)
 
 def find_first(array, val, rev=False):
     """ Finds the first (or last) occurence of val in array
