@@ -47,12 +47,12 @@ class Final_Driver(Driver):
         Args:
             steering_values:    ???
             global_max_speed:   ???
-        
+
         """
         super(Final_Driver, self).__init__()
         self.iter = 0
         self.basic_control = BasicControl(steering_values)
-        self.back_up_driver = CrisisDriver(logdata=False)
+        self.back_up_driver = Driver(logdata=False)
         self.bad_counter = 0
         self.lap_counter = 0
         self.last_opponents = [0 for x in range(36)]
@@ -74,10 +74,10 @@ class Final_Driver(Driver):
 
         Args:
             carstate:   All parameters packed in a State object
-        
+
         Returns:
             command:    The next move packed in a Command object
-        
+
         """
 
         # trackers
@@ -91,7 +91,7 @@ class Final_Driver(Driver):
         for dist in carstate.opponents:
             if dist == 0:
                 self.contact_in_last_frame = True
-        
+
         # crisis handling
         if ENABLE_CRISIS_DRIVER:
             if self.back_up_driver.is_in_control:
@@ -157,7 +157,7 @@ class Final_Driver(Driver):
             self.crashed_in_last_frame = False
             self.contact_in_last_frame = False
             self.previous_frame_position = position
-        
+
         pedal = self.basic_control.speed_decider(carstate, max_speed=self.max_speed)
 
         # make sure we don't drive at people
@@ -182,7 +182,7 @@ class Final_Driver(Driver):
         if abs(carstate.current_lap_time) < 0.020:
             self.lap_counter += 1
             self.cummulative_time += carstate.last_lap_time + self.cummulative_time
-    
+
     def print_trackers(self, carstate, r=False):
         """ Prints info on the race """
         line_end = '\r' if r else '\n'
