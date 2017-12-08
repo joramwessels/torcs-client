@@ -16,6 +16,8 @@
 from sys import stderr
 from collections import defaultdict
 from numbers import Real
+from os.path import isfile
+from os import remove
 import numpy as np
 
 SEP = ','            # the separator used in the feromone trail files
@@ -68,6 +70,8 @@ class FeromoneTrail:
         self.filename = NAME + '_' + track_id if track_id else NAME
         self.table = defaultdict(lambda: np.zeros(spd_n))
         self.leave_feromone(0, 0, 0)
+        if isfile(self.filename):
+            remove(self.filename)
     
     def ___str___(self):
         """ Casts the feromone trail table to a string representation """

@@ -26,8 +26,8 @@ PRINT_CYCLE_INTERVAL = 100 # freqency of print output in game cycles
 PRINT_STATE = True
 PRINT_COMMAND = False
 
-ENABLE_SWARM = False
-ENABLE_CRISIS_DRIVER = False
+ENABLE_SWARM = True
+ENABLE_CRISIS_DRIVER = True
 
 # swarm metaparameters
 swarm_pos_int  = 20
@@ -67,7 +67,6 @@ class Final_Driver(Driver):
             self.crashed_in_last_frame = False
             self.contact_in_last_frame = False
             self.previous_frame_position = 0
-            self.previous_frame_lap = 0
 
     def drive(self, carstate: State) -> Command:
         """ Description
@@ -79,6 +78,7 @@ class Final_Driver(Driver):
             command:    The next move packed in a Command object
 
         """
+        self.iter += 1
         self.back_up_driver.update_status(carstate)
 
         # trackers
@@ -123,7 +123,7 @@ class Final_Driver(Driver):
         # checking in on the swarm
         position = carstate.distance_from_start
         new_frame = position > (self.previous_frame_position + self.swarm.pos_int)
-        new_lap = self.lap_counter > self.previous_frame_lap
+        new_lap = self.previous_frame_position > (position + self.swarm.pos_int)
         if ENABLE_SWARM and (new_frame or new_lap):
             position = int(position - (position % self.swarm.pos_int))
             self.max_speed = self.swarm.check_in(
@@ -131,12 +131,10 @@ class Final_Driver(Driver):
                                         carstate.speed_x,
                                         self.crashed_in_last_frame,
                                         self.contact_in_last_frame)
-            err("Swarm: position=%i, max_speed=%i" %(position, self.max_speed))
-            if new_lap:
-                self.previous_frame_lap = self.lap_counter
             self.crashed_in_last_frame = False
             self.contact_in_last_frame = False
             self.previous_frame_position = position
+        debug(self.iter, "SWARM:  max_speed=%i" %self.max_speed)
 
         # basic predictions
         gear       = self.basic_control.gear_decider(carstate)
@@ -178,12 +176,19 @@ class Final_Driver(Driver):
     def print_trackers(self, carstate, r=False):
         """ Prints info on the race """
         line_end = '\r' if r else '\n'
-        print("Lap=%i, CurLapTime=%.2f, dist=%.2f, time=%.2f"
-               %(carstate.current_lap_time, self.lap_counter,
+        print("  Lap=%i, CurLapTime=%.2f, dist=%.2f, time=%.2f"
+               %(self.lap_counter, carstate.current_lap_time,
                  carstate.distance_raced,
                  self.cummulative_time + carstate.current_lap_time)
                , end=line_end)
 
+
+
+def debug(iter, *args):
+    """ prints debug info to stderr """
+    if iter % 200 == 0:
+        print(iter, *args, " "*20, file=stderr)
+
 def err(*args):
     """ prints to standard error """
-    print(*args, file=stderr)
+    print(*args, " "*20, file=stderr)
