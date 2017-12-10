@@ -23,6 +23,7 @@ def mutate_small(gene, ranges, mutation_probability=0.2, increment=0.01):
             elif new_feature < ranges[index][0]:
                 new_feature = ranges[index][0]
         new_gene.append(ranges[index][2](new_feature))
+    return new_gene
 
 def mutate_random(gene, ranges, mutation_probability=0.1):
     new_gene = []
@@ -32,6 +33,7 @@ def mutate_random(gene, ranges, mutation_probability=0.1):
         if np.random.random_sample() >= (1 - mutation_probability):
             new_feature = np.random.uniform(ranges[index][0], ranges[index][1])
         new_gene.append(ranges[index][2](new_feature))
+    return new_gene
 
 def evaluate(gene):
     evaluation = -99999999
@@ -49,7 +51,6 @@ def evaluate(gene):
 
 def select(population, evaluations, count):
     surviving_parents = []
-    print(evaluations)
     for x in range(count):
         index = np.argmax(np.array(evaluations))
         surviving_parents.append(population[index])
@@ -90,35 +91,40 @@ def print_survivors(survivors, evaluations):
     for survivor_index, survivor in enumerate(survivors):
         print_gene(survivor, survivor_index, evaluations[survivor_index])
 
-def main(population_size, ranges, max_generations=100, survivor_count=5):
+def main(population_size, ranges, max_generations=100, survivor_count=5, file_name="gen.data"):
     population = []
     for index in range(population_size):
         population.append(get_random_gene(ranges))
     generation = 0
 
     print("max_generations={}, population_size={}, survivor_count={}".format(max_generations, population_size, survivor_count))
-    while not terminate(max_generations, generation):
-        generation += 1
-        print_generation(generation)
-        evaluation = [evaluate(gene) for gene in population]
-        for gene_index, gene in enumerate(population):
-            print_gene(gene, gene_index, evaluation[gene_index])
+    with open(file_name, "+w") as f:
 
-        survivors = select(population=population, evaluations=evaluation, count=survivor_count)
-        print_survivors(survivors=survivors, evaluations=evaluation)
+        while not terminate(max_generations, generation):
+            generation += 1
+            print_generation(generation)
+            evaluation = [evaluate(gene) for gene in population]
 
-        population = []
-        for survivor in survivors:
-            population.append(survivor)
-            for child_i in range(0, int(population_size/survivor_count)):
-                changed = False
-                while not changed:
-                    new_gene = mutate_small(gene=survivor, ranges=ranges, mutation_probability=0.2, increment=0.01)
-                    print(new_gene)
-                    new_gene = mutate_random(gene=new_gene, ranges=ranges, mutation_probability=0.2)
-                    if new_gene != survivor:
-                        changed = True
-                population.append(new_gene)
+            # write best gene value to file
+            f.writelines("{},{}".format(generation, max(evaluation)))
+
+            for gene_index, gene in enumerate(population):
+                print_gene(gene, gene_index, evaluation[gene_index])
+
+            survivors = select(population=population, evaluations=evaluation, count=survivor_count)
+            print_survivors(survivors=survivors, evaluations=evaluation)
+
+            population = []
+            for survivor in survivors:
+                population.append(survivor)
+                for child_i in range(0, int(population_size/survivor_count)):
+                    changed = False
+                    while not changed:
+                        new_gene = mutate_small(gene=survivor, ranges=ranges, mutation_probability=0.2, increment=0.01)
+                        new_gene = mutate_random(gene=new_gene, ranges=ranges, mutation_probability=0.2)
+                        if new_gene != survivor:
+                            changed = True
+                    population.append(new_gene)
 
 
 if __name__ == "__main__":

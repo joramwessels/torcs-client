@@ -77,8 +77,8 @@ class Final_Driver(Driver):
 
         # trackers
         self.update_trackers(carstate)
-        if PRINT_STATE and self.iter % PRINT_CYCLE_INTERVAL:
-            self.print_trackers(carstate, r=True)
+        if PRINT_STATE and (self.iter % PRINT_CYCLE_INTERVAL) == 0:
+            self.print_trackers(carstate, r=False)
 
         # crash and collision detection for swarm
         if is_offroad(carstate):
@@ -167,6 +167,7 @@ class Final_Driver(Driver):
 
     def update_trackers(self, carstate):
         """ Updates info about the race """
+        self.iter += 1
         if abs(carstate.current_lap_time) < 0.020:
             self.lap_counter += 1
             self.cummulative_time += carstate.last_lap_time + self.cummulative_time
@@ -174,7 +175,7 @@ class Final_Driver(Driver):
     def print_trackers(self, carstate, r=False):
         """ Prints info on the race """
         line_end = '\r' if r else '\n'
-        print("Lap=%i, CurLapTime=%.2f, dist=%.2f, time=%.2f"
+        print("Lap=%i CurLapTime=%.2f dist=%.2f time=%.2f"
                %(carstate.current_lap_time, self.lap_counter,
                  carstate.distance_raced,
                  self.cummulative_time + carstate.current_lap_time)

@@ -116,8 +116,8 @@ def run_on_tracks(driver, tracks, steering_values, max_speed, timeout):
 def get_distance_covered(client_out):
     distance = -1
     for index in range(len(client_out) - 1, 0, -1):
-        if "distance" in client_out[index]:
-            distance = int(float(client_out[index].strip().split("=")[1]))
+        if "dist" in client_out[index]:
+            distance = int(float(client_out[index].strip().split()[2].split("=")[1]))
             break
     return distance
 
@@ -125,6 +125,8 @@ def get_total_time_covered(client_out):
     time = -1
     for index in range(len(client_out) - 1, 0, -1):
         if "time" in client_out[index]:
-            time = int(float(client_out[index].strip().split("=")[1]))
+            time = int(float(client_out[index].strip().split()[3].split("=")[1]))
             break
+    if time == -1:
+        print(client_out)
     return time
