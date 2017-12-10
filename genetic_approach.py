@@ -2,12 +2,14 @@ import numpy as np
 import random
 import run_torcs
 from multiprocessing import TimeoutError
+import time
 
 ranges = [(-5,5,float),(-5,5,float),(-5,5,float),(-5,5,float),(-5,5,float),(10,360,int)]
 
 def mutate_small(gene, ranges, mutation_probability=0.2, increment=0.01):
     new_gene = []
     for index, feature in enumerate(gene):
+        print("working with:",feature)
         new_feature = feature
         # with probability we mutate
         if np.random.random_sample() >= (1 - mutation_probability):
@@ -22,37 +24,41 @@ def mutate_small(gene, ranges, mutation_probability=0.2, increment=0.01):
                 new_feature = ranges[index][1]
             elif new_feature < ranges[index][0]:
                 new_feature = ranges[index][0]
+            print("Mutated:", new_feature)
         new_gene.append(ranges[index][2](new_feature))
     return new_gene
 
 def mutate_random(gene, ranges, mutation_probability=0.1):
     new_gene = []
     for index, feature in enumerate(gene):
+        print("working with:",feature)
         new_feature = feature
         # with probability we mutate
         if np.random.random_sample() >= (1 - mutation_probability):
             new_feature = np.random.uniform(ranges[index][0], ranges[index][1])
+            print("Mutated:", new_feature)
         new_gene.append(ranges[index][2](new_feature))
     return new_gene
 
 def evaluate(gene):
     evaluation = -99999999
-    client, server = run_torcs.run_on_ea_tracks('scr_server', steering_values=gene[:5], max_speed=int(gene[5]), timeout=3)
-    time = []
-    distance = []
-    for track in client:
-        distance.append(run_torcs.get_distance_covered(track))
-        time.append(run_torcs.get_total_time_covered(track))
-    print(distance)
-    print(time)
-    evaluation = sum(list(map((lambda x, y: x/y), distance, time)))/len(client)
-
+    gene = [0.21, 1.56, 0.68, 0.53, 1.25, 160]
+    print(gene)
+    try:
+        client, server = run_torcs.run_on_all_tracks('scr_server', steering_values=gene[:5], max_speed=gene[5], timeout=5)
+        for line in server:
+            print(line)
+        for line in client:
+            print(line)
+    except TimeoutError as e:
+        pass
+    print("done!")
     return evaluation
 
 def select(population, evaluations, count):
     surviving_parents = []
     for x in range(count):
-        index = np.argmax(np.array(evaluations))
+        index = np.argmax(evaluations)
         surviving_parents.append(population[index])
         del population[index]
         del evaluations[index]
@@ -64,17 +70,16 @@ def get_random_gene(ranges):
         gene.append(np.random.uniform(low, high))
     return gene
 
-def terminate(max_generations, generation):
-    if generation > max_generations:
-        print("Maximum generation reached")
+def terminate(evaluation):
+    maximum = max(evaluation)
+    average = sum(evaluation)/len(evaluation)
+    print_evalution(maximum, average, min(evaluation))
+    if maximum - average <= 50:
         return True
-    # if maximum - average <= 1:
-    #     print("Maximum and average are close")
-    #     return True
-    # else:
-    return False
+    else:
+        return False
 
-def print_generation_values(maximum, average, minimum):
+def print_evalution(maximum, average, minimum):
     print("maximum:", maximum)
     print("average:", average)
     print("minimum:", minimum)
@@ -95,7 +100,6 @@ def main(population_size, ranges, max_generations=100, survivor_count=5, file_na
     population = []
     for index in range(population_size):
         population.append(get_random_gene(ranges))
-    generation = 0
 
     print("max_generations={}, population_size={}, survivor_count={}".format(max_generations, population_size, survivor_count))
     with open(file_name, "+w") as f:
@@ -128,4 +132,4 @@ def main(population_size, ranges, max_generations=100, survivor_count=5, file_na
 
 
 if __name__ == "__main__":
-    main(population_size=2, ranges=ranges, max_generations=3, survivor_count=1)
+    main(1, ranges)
