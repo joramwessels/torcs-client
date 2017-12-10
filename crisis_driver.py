@@ -66,28 +66,28 @@ class CrisisDriver(Driver):
 
         Args:
             carstate:   All parameters packed in a State object
-        
+
         Returns:
             command:    The next move packed in a Command object
-        
+
         """
         command = Command()
-        command.acceleration = 0
+        command.accelerator = 0
         self.appr_counter += 1
         debug(self.iter, "CRISIS: appr_counter=%i" %self.appr_counter)
         if self.appr_counter > APPROACH_TIMEOUT:
             self.next_approach()
         command = self.approaches[self.approach](carstate, command)
-        self.previous_accels.append(command.acceleration)
+        self.previous_accels.append(command.accelerator)
         self.previous_gears.append(command.gear)
         return command
-    
+
     def pass_control(self, carstate):
         """ Initializes a new crisis that has not been handled yet
 
         Args:
             carstate:   The original carstate
-        
+
         """
         err(self.iter,"CRISIS: control received")
         self.is_in_control = True
@@ -98,12 +98,12 @@ class CrisisDriver(Driver):
         # check if car behind
         # check track angle and side of the road
         # determine reverse or straight ahead
-    
+
     def return_control(self):
         """ Passes control back to the main driver """
         err(self.iter,"CRISIS: control returned")
         self.is_in_control = False
-    
+
     def next_approach(self):
         """ Adjusts state to next approach """
         self.approach += 1
@@ -114,7 +114,7 @@ class CrisisDriver(Driver):
         else:
             err(self.iter,"CRISIS: next approach:",
                 self.approaches[self.approach].__name__)
-    
+
     def approach_succesful(self):
         """ Called when a technique finished executing
         """
@@ -124,13 +124,13 @@ class CrisisDriver(Driver):
             self.next_approach()
         else:
             self.return_control()
-    
+
     def update_status(self, carstate):
         """ Updates the status of the car regarding its problems
 
         Args:
             carstate:   The full carstate
-        
+
         """
         self.iter += 1
         if len(self.previous_angles) >= MAX_ANGLES:
@@ -149,7 +149,7 @@ class CrisisDriver(Driver):
         self.faces_back   = not self.faces_front
         self.faces_middle = self.is_on_left_side == self.faces_right
 
-        self.is_standing_still = carstate.speed_x ==0 
+        self.is_standing_still = carstate.speed_x ==0
         self.has_car_in_front  = car_in_front(carstate.opponents)
         self.has_car_behind    = car_behind(carstate.opponents)
         self.is_blocked        = blocked(self.previous_accels,
@@ -180,22 +180,22 @@ class CrisisDriver(Driver):
         Args:
             carstate:       The full carstate as passed down by the server
             command:        The command to adjust
-        
+
         """
         command = self.driver.drive(carstate)
         is_stuck = abs(carstate.speed_x) <= 5 and carstate.current_lap_time >= 10
-        if self.bad_counter >= BAD_COUNTER_MANUAL_THRESHOLD and is_stuck:
+        #if self.bad_counter >= BAD_COUNTER_MANUAL_THRESHOLD and is_stuck:
             # we try reversing
-            command.gear = -command.gear
-            if command.gear < 0:
-                command.steering = -command.steering
-                command.gear = -1
-            self.bad_counter = 200
+            # command.gear = -command.gear
+            # if command.gear < 0:
+            #     command.steering = -command.steering
+            #     command.gear = -1
+            # self.bad_counter = 200
         return command
-    
+
     def navigate_to_middle(self, carstate, command):
         """ Finds it way to the middle of the road by driving in reverse
-        
+
         approach 1) reverse towards the road, then once on the road,
                     reverse towards the the middle until facing foward
                     with an angle that's within the margin
@@ -203,12 +203,12 @@ class CrisisDriver(Driver):
         Args:
             carstate:       The full carstate as passed down by the server
             command:        The command to adjust
-        
+
         """
         debug(self.iter,"CRISIS: navigate_to_middle")
         if self.is_blocked:
             command.gear = -1
-            command.acceleration = 1.0
+            command.accelerator = 1.0
         elif self.is_off_road:
             perp_angle = 90 * sign(carstate.distance_from_center)
             if self.faces_middle:
@@ -216,10 +216,10 @@ class CrisisDriver(Driver):
                 if not abs(diff_with_perp_angle) < PRP_ANG_MARGIN:
                     command.steering = -sign(diff_with_perp_angle)
                 command.gear = 1
-                command.acceleration = OFF_ROAD_ACC
+                command.accelerator = OFF_ROAD_ACC
                 debug(self.iter,"        off road and facing road")
                 debug(self.iter,"        perp_angle=%.2f" %perp_angle)
-                debug(self.iter,"        acc=%.2f" %command.acceleration)
+                debug(self.iter,"        acc=%.2f" %command.accelerator)
                 debug(self.iter,"        ang=%.2f" %carstate.angle)
                 debug(self.iter,"        ste=%.2f" %command.steering)
             else:
@@ -227,10 +227,10 @@ class CrisisDriver(Driver):
                 if not abs(diff_with_perp_angle) < PRP_ANG_MARGIN:
                     command.steering = -sign(diff_with_perp_angle)
                 command.gear = -1
-                command.acceleration = OFF_ROAD_REV_ACC
+                command.accelerator = OFF_ROAD_REV_ACC
                 debug(self.iter,"        off road and not facing road")
                 debug(self.iter,"        perp_angle=%.2f" %perp_angle)
-                debug(self.iter,"        acc=%.2f" %command.acceleration)
+                debug(self.iter,"        acc=%.2f" %command.accelerator)
                 debug(self.iter,"        ang=%.2f" %carstate.angle)
                 debug(self.iter,"        ste=%.2f" %command.steering)
         else:
@@ -241,12 +241,12 @@ class CrisisDriver(Driver):
                 if self.faces_middle:
                     debug(self.iter,"        on road facing middle")
                     command.gear = 1
-                    command.acceleration = ACC
+                    command.accelerator = ACC
                 else:
                     debug(self.iter,"        on road not facing middle")
                     command.gear = -1
-                    command.acceleration = REV_ACC
-                debug(self.iter,"        acc=%.2f" %command.acceleration)
+                    command.accelerator = REV_ACC
+                debug(self.iter,"        acc=%.2f" %command.accelerator)
                 debug(self.iter,"        ang=%.2f" %carstate.angle)
                 debug(self.iter,"        ste=%.2f" %command.steering)
         return command

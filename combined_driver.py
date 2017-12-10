@@ -26,7 +26,7 @@ PRINT_CYCLE_INTERVAL = 100 # freqency of print output in game cycles
 PRINT_STATE = True
 PRINT_COMMAND = False
 
-ENABLE_SWARM = True
+ENABLE_SWARM = False
 ENABLE_CRISIS_DRIVER = True
 
 # swarm metaparameters
@@ -101,7 +101,7 @@ class Final_Driver(Driver):
             elif self.back_up_driver.needs_help:
                 self.back_up_driver.pass_control(carstate)
                 return self.back_up_driver.drive(carstate)
-        
+
         # since the data and python's values differ we need to adjust them
         carstate.angle   = radians(carstate.angle)
         carstate.speed_x = carstate.speed_x*3.6
@@ -121,19 +121,21 @@ class Final_Driver(Driver):
         """
 
         # checking in on the swarm
-        position = carstate.distance_from_start
-        new_frame = position > (self.previous_frame_position + self.swarm.pos_int)
-        new_lap = self.previous_frame_position > (position + self.swarm.pos_int)
-        if ENABLE_SWARM and (new_frame or new_lap):
-            position = int(position - (position % self.swarm.pos_int))
-            self.max_speed = self.swarm.check_in(
-                                        position,
-                                        carstate.speed_x,
-                                        self.crashed_in_last_frame,
-                                        self.contact_in_last_frame)
-            self.crashed_in_last_frame = False
-            self.contact_in_last_frame = False
-            self.previous_frame_position = position
+        if ENABLE_SWARM:
+            position = carstate.distance_from_start
+            new_frame = position > (self.previous_frame_position + self.swarm.pos_int)
+            new_lap = self.previous_frame_position > (position + self.swarm.pos_int)
+            if new_frame or new_lap:
+
+                position = int(position - (position % self.swarm.pos_int))
+                self.max_speed = self.swarm.check_in(
+                                            position,
+                                            carstate.speed_x,
+                                            self.crashed_in_last_frame,
+                                            self.contact_in_last_frame)
+                self.crashed_in_last_frame = False
+                self.contact_in_last_frame = False
+                self.previous_frame_position = position
         debug(self.iter, "SWARM:  max_speed=%i" %self.max_speed)
 
         # basic predictions
@@ -152,7 +154,7 @@ class Final_Driver(Driver):
 
         # disambiguating pedal with smoothing
         brake, accel = self.basic_control.disambiguate_pedal(pedal, accel_cap=1.0)
-        
+
         # debug output
         if PRINT_COMMAND and self.iter % PRINT_CYCLE_INTERVAL:
             print("Executing comand: gear=%.2f, acc=%.2f," %(gear, accel),
@@ -178,7 +180,8 @@ class Final_Driver(Driver):
         """ Prints info on the race """
         line_end = '\r' if r else '\n'
         print("Lap=%i CurLapTime=%.2f dist=%.2f time=%.2f"
-               %(carstate.current_lap_time, self.lap_counter,
+               %(self.lap_counter,
+                 carstate.current_lap_time,               
                  carstate.distance_raced,
                  self.cummulative_time + carstate.current_lap_time)
                , end=line_end)
