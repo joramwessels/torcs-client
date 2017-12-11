@@ -80,7 +80,7 @@ class Final_Driver(Driver):
 
         # trackers
         self.update_trackers(carstate)
-        if PRINT_STATE and self.iter % PRINT_CYCLE_INTERVAL:
+        if PRINT_STATE and (self.iter % PRINT_CYCLE_INTERVAL) == 0:
             self.print_trackers(carstate, r=True)
 
         # crash and collision detection for swarm
@@ -99,7 +99,7 @@ class Final_Driver(Driver):
                 err(self.iter, "SWARM:  crashed")
                 self.back_up_driver.pass_control(carstate)
                 return self.back_up_driver.drive(carstate)
-        
+
         # since the data and python's values differ we need to adjust them
         carstate.angle   = radians(carstate.angle)
         carstate.speed_x = carstate.speed_x*3.6
@@ -150,7 +150,7 @@ class Final_Driver(Driver):
 
         # disambiguating pedal with smoothing
         brake, accel = self.basic_control.disambiguate_pedal(pedal, accel_cap=1.0)
-        
+
         # debug output
         if PRINT_COMMAND and self.iter % PRINT_CYCLE_INTERVAL:
             print("Executing comand: gear=%.2f, acc=%.2f," %(gear, accel),
@@ -172,6 +172,7 @@ class Final_Driver(Driver):
 
     def update_trackers(self, carstate):
         """ Updates info about the race """
+        self.iter += 1
         if abs(carstate.current_lap_time) < 0.020:
             self.lap_counter += 1
             self.cummulative_time += carstate.last_lap_time + self.cummulative_time
@@ -179,8 +180,9 @@ class Final_Driver(Driver):
     def print_trackers(self, carstate, r=False):
         """ Prints info on the race """
         line_end = '\r' if r else '\n'
-        print("  Lap=%i, CurLapTime=%.2f, dist=%.2f, time=%.2f"
-               %(self.lap_counter, carstate.current_lap_time,
+        print("Lap=%i CurLapTime=%.2f dist=%.2f time=%.2f"
+               %(self.lap_counter,
+                 carstate.current_lap_time,               
                  carstate.distance_raced,
                  self.cummulative_time + carstate.current_lap_time)
                , end=line_end)

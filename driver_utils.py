@@ -18,6 +18,7 @@ ANG_R, ANG_L = 1, -1
 DFC_R, DFC_L = -1, 1
 
 # printing
+ENABLE_DEBUG_INFO = True
 PRINT_CYCLE_INTERVAL = 100 # freqency of print output in game cycles
 PRINT_STATE = True
 PRINT_COMMAND = False
@@ -54,9 +55,9 @@ def away_from_ang(ang):
 def debug(iter, *args):
     """ prints debug info to stderr """
     if iter % PRINT_CYCLE_INTERVAL == 0:
-        spc = 6-len(str(iter))
-        print(iter, ' '*spc, *args, " "*30, file=stderr)
+        err(iter, *args)
 
 def err(iter, *args):
+    if ENABLE_DEBUG_INFO:
         spc = 6-len(str(iter))
         print(iter, ' '*spc, *args, " "*30, file=stderr)

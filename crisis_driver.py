@@ -67,10 +67,10 @@ class CrisisDriver(Driver):
 
         Args:
             carstate:   All parameters packed in a State object
-        
+
         Returns:
             command:    The next move packed in a Command object
-        
+
         """
         command = Command()
         command.accelerator = 0
@@ -85,13 +85,13 @@ class CrisisDriver(Driver):
             err(self.iter, "ERROR:", str(e))
 
         return command
-    
+
     def pass_control(self, carstate):
         """ Initializes a new crisis that has not been handled yet
 
         Args:
             carstate:   The original carstate
-        
+
         """
         err(self.iter,"CRISIS: control received")
         self.is_in_control = True
@@ -101,7 +101,7 @@ class CrisisDriver(Driver):
         # check if car behind
         # check track angle and side of the road
         # determine reverse or straight ahead
-    
+
     def return_control(self):
         """ Passes control back to the main driver """
         err(self.iter,"CRISIS: control returned")
@@ -118,7 +118,7 @@ class CrisisDriver(Driver):
         else:
             err(self.iter,"CRISIS: next approach:",
                 self.approaches[self.approach].__name__)
-    
+
     def approach_succesful(self):
         """ Called when a technique finished executing
         """
@@ -128,13 +128,13 @@ class CrisisDriver(Driver):
             self.next_approach()
         else:
             self.return_control()
-    
+
     def update_status(self, carstate):
         """ Updates the status of the car regarding its problems
 
         Args:
             carstate:   The full carstate
-        
+
         """
         self.iter += 1
         if len(self.previous_angles) >= MAX_ANGLES:
@@ -196,22 +196,22 @@ class CrisisDriver(Driver):
         Args:
             carstate:       The full carstate as passed down by the server
             command:        The command to adjust
-        
+
         """
         command = self.driver.drive(carstate) # TODO is this legal?
         is_stuck = abs(carstate.speed_x) <= 5 and carstate.current_lap_time >= 10
-        if self.bad_counter >= BAD_COUNTER_MANUAL_THRESHOLD and is_stuck:
+        #if self.bad_counter >= BAD_COUNTER_MANUAL_THRESHOLD and is_stuck:
             # we try reversing
-            command.gear = -command.gear
-            if command.gear < 0:
-                command.steering = -command.steering
-                command.gear = -1
-            self.bad_counter = 200
+            # command.gear = -command.gear
+            # if command.gear < 0:
+            #     command.steering = -command.steering
+            #     command.gear = -1
+            # self.bad_counter = 200
         return command
-    
+
     def navigate_to_middle(self, carstate, command):
         """ Finds it way to the middle of the road by driving in reverse
-        
+
         approach 1) reverse towards the road, then once on the road,
                     reverse towards the the middle until facing foward
                     with an angle that's within the margin
@@ -219,7 +219,7 @@ class CrisisDriver(Driver):
         Args:
             carstate:       The full carstate as passed down by the server
             command:        The command to adjust
-        
+
         """
         debug(self.iter,"CRISIS: navigate_to_middle")
 
