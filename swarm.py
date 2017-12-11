@@ -170,8 +170,8 @@ class FeromoneTrail:
         i2 = find_first(row, -1)
         i_glb_max = self.to_index(self.glb_max)
 
-        # if there are no occurences of +
-        if i1 == -1:
+        # if there are no occurences of + above glb_max
+        if i1 == -1 or (i1 < i_glb_max and not row[i_glb_max] == -1):
             if row[i_glb_max] == -1:
                 i1 = i2 - 1                      # last 0 before first -
             else:
@@ -346,20 +346,3 @@ def breakable_speed(end_speed, trajectory):
     # Assuming a linear decrease in speed, the maximum rate
     # of desceleration is therefore -280/65 = -4.31 km/h/m.
     return trajectory * 4.31 + end_speed
-
-"""
-import swarm
-trail = swarm.FeromoneTrail(
-            swarm_pos_int, swarm_spd_int,
-            swarm_spd0,    swarm_spd_n,
-            swarm_expl_int, global_max_speed)
-
-pos = ...
-spd = ...
-crashed = ...
-contact = ...
-
-if distTraveled % trail.pos_int == 0:
-    max_speed = trail.check_in(pos, spd, crashed, contact)
-    crashed, contact = False, False
-"""

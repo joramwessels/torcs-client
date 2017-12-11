@@ -12,7 +12,9 @@ from pytocl.car import State, Command
 from sys import stderr
 from numpy import sign
 
-# margins of error when trying the reverse_to_middle approach
+from driver_utils import *
+
+# margins of error when trying the navigate_to_middle approach
 CTR_ANG_MARGIN = 10
 PRP_ANG_MARGIN = 10
 
@@ -20,18 +22,17 @@ PRP_ANG_MARGIN = 10
 ACC              = 0.1
 REV_ACC          = 0.1
 OFF_ROAD_ACC     = 0.1
-OFF_ROAD_REV_ACC = 0.1
-
-# as stated by Torcs documentation
-MAX_WHEEL_ROTATION = 21
+OFF_ROAD_REV_ACC = 0.2
 
 # timers (100 = 2 sec)
 BAD_COUNTER_THRESHOLD = 100
 BAD_COUNTER_MANUAL_THRESHOLD = 600
 APPROACH_TIMEOUT = 1000
 
-MAX_ANGLES = 256 # amount of angles to keep track of
+# cross-cycle trackers
+MAX_ANGLES = 64 # amount of angles to keep track of
 MAX_ACCELS = 16  # amount of cycles in which you should have moved
+MAX_GEARS = MAX_ACCELS
 
 # TODO
 # - back off when blocked
@@ -49,7 +50,7 @@ class CrisisDriver(Driver):
         self.iter = 0
         self.driver = Driver(logdata=False)
         self.is_in_control = False
-        self.approaches = [self.navigate_to_middle, self.original_implementation]
+        self.approaches = [self.navigate_to_middle, self.navigate_to_middle, self.original_implementation]
         self.previous_angles = []
         self.previous_accels = []
         self.previous_gears  = []
@@ -72,14 +73,17 @@ class CrisisDriver(Driver):
         
         """
         command = Command()
-        command.acceleration = 0
+        command.accelerator = 0
         self.appr_counter += 1
-        debug(self.iter, "CRISIS: appr_counter=%i" %self.appr_counter)
         if self.appr_counter > APPROACH_TIMEOUT:
             self.next_approach()
-        command = self.approaches[self.approach](carstate, command)
-        self.previous_accels.append(command.acceleration)
-        self.previous_gears.append(command.gear)
+        try:
+            command = self.approaches[self.approach](carstate, command)
+            self.previous_accels.append(command.accelerator)
+            self.previous_gears.append(command.gear)
+        except Exception as e:
+            err(self.iter, "ERROR:", str(e))
+
         return command
     
     def pass_control(self, carstate):
@@ -93,7 +97,6 @@ class CrisisDriver(Driver):
         self.is_in_control = True
         self.approach = 0
         self.appr_counter = 0
-        self.accels = []
         # check if car in front
         # check if car behind
         # check track angle and side of the road
@@ -103,14 +106,15 @@ class CrisisDriver(Driver):
         """ Passes control back to the main driver """
         err(self.iter,"CRISIS: control returned")
         self.is_in_control = False
+        self.needs_help = False
     
     def next_approach(self):
         """ Adjusts state to next approach """
         self.approach += 1
         self.appr_counter = 0
         if self.approach >= len(self.approaches):
-            self.return_control()
             self.approach -= 1
+            self.return_control()
         else:
             err(self.iter,"CRISIS: next approach:",
                 self.approaches[self.approach].__name__)
@@ -138,32 +142,44 @@ class CrisisDriver(Driver):
         self.previous_angles.append(carstate.angle)
         if len(self.previous_accels) >= MAX_ACCELS:
             self.previous_accels.pop(0)
-        if len(self.previous_gears)  >= MAX_ACCELS:
-            self.previous_accels.pop(0)
+        self.previous_gears.append(sign(carstate.gear))
+        if len(self.previous_gears)  >= MAX_GEARS:
+            self.previous_gears.pop(0)
 
-        self.is_on_left_side  = sign(carstate.distance_from_center) == 1
+        self.is_on_left_side  = sign(carstate.distance_from_center) == DFC_L
         self.is_on_right_side = not self.is_on_left_side
-        self.faces_left   = sign(carstate.angle) == -1
+        self.faces_left   = sign(carstate.angle) == ANG_L
         self.faces_right  = not self.faces_left
         self.faces_front  = abs(carstate.angle) < 90
         self.faces_back   = not self.faces_front
         self.faces_middle = self.is_on_left_side == self.faces_right
 
-        self.is_standing_still = carstate.speed_x ==0 
+        self.is_standing_still = abs(carstate.speed_x) < 0.1 
         self.has_car_in_front  = car_in_front(carstate.opponents)
         self.has_car_behind    = car_behind(carstate.opponents)
         self.is_blocked        = blocked(self.previous_accels,
                                          self.previous_gears,
                                          carstate.speed_x)
-        self.is_off_road = sign(max(carstate.distances_from_edge)) == -1 # TODO verify
+        self.is_off_road = max(carstate.distances_from_edge) == -1
         self.is_reversed = self.faces_back
         self.is_going_in_circles = going_in_circles(self.previous_angles)
+        self.is_traveling_sideways = abs(carstate.speed_y) > 15
         self.has_problem = self.is_off_road or \
                            self.is_going_in_circles or \
-                           self.is_blocked
+                           self.is_blocked or \
+                           self.is_reversed or \
+                           self.is_traveling_sideways
         if self.has_problem:
             self.bad_counter += 1
             if self.bad_counter >= BAD_COUNTER_THRESHOLD:
+                if self.is_off_road:
+                    debug(self.iter, "        off road")
+                if self.is_going_in_circles:
+                    debug(self.iter, "        going in circles")
+                if self.is_blocked:
+                    debug(self.iter, "        blocked")
+                if self.is_reversed:
+                    debug(self.iter, "        reversed")
                 self.needs_help = True
         else:
             self.bad_counter = 0
@@ -182,7 +198,7 @@ class CrisisDriver(Driver):
             command:        The command to adjust
         
         """
-        command = self.driver.drive(carstate)
+        command = self.driver.drive(carstate) # TODO is this legal?
         is_stuck = abs(carstate.speed_x) <= 5 and carstate.current_lap_time >= 10
         if self.bad_counter >= BAD_COUNTER_MANUAL_THRESHOLD and is_stuck:
             # we try reversing
@@ -206,49 +222,54 @@ class CrisisDriver(Driver):
         
         """
         debug(self.iter,"CRISIS: navigate_to_middle")
-        if self.is_blocked:
-            command.gear = -1
-            command.acceleration = 1.0
-        elif self.is_off_road:
-            perp_angle = 90 * sign(carstate.distance_from_center)
+
+        dfc = carstate.distance_from_center
+        if self.is_off_road:
+            dist_spd = 2 if abs(dfc) > 10 else 1
+            perp_angle = 90 * sign(dfc)
             if self.faces_middle:
+                debug(self.iter,"        off road and facing road")
                 diff_with_perp_angle = perp_angle - carstate.angle
                 if not abs(diff_with_perp_angle) < PRP_ANG_MARGIN:
-                    command.steering = -sign(diff_with_perp_angle)
+                    command.steering = sign(diff_with_perp_angle) * STR_R
                 command.gear = 1
-                command.acceleration = OFF_ROAD_ACC
-                debug(self.iter,"        off road and facing road")
-                debug(self.iter,"        perp_angle=%.2f" %perp_angle)
-                debug(self.iter,"        acc=%.2f" %command.acceleration)
-                debug(self.iter,"        ang=%.2f" %carstate.angle)
-                debug(self.iter,"        ste=%.2f" %command.steering)
+                command.accelerator = OFF_ROAD_ACC * dist_spd
             else:
+                debug(self.iter,"        off road and not facing road")
                 diff_with_perp_angle = perp_angle + carstate.angle
                 if not abs(diff_with_perp_angle) < PRP_ANG_MARGIN:
-                    command.steering = -sign(diff_with_perp_angle)
+                    command.steering = sign(diff_with_perp_angle) * STR_R
                 command.gear = -1
-                command.acceleration = OFF_ROAD_REV_ACC
-                debug(self.iter,"        off road and not facing road")
-                debug(self.iter,"        perp_angle=%.2f" %perp_angle)
-                debug(self.iter,"        acc=%.2f" %command.acceleration)
-                debug(self.iter,"        ang=%.2f" %carstate.angle)
-                debug(self.iter,"        ste=%.2f" %command.steering)
+                command.accelerator = OFF_ROAD_REV_ACC * dist_spd
         else:
             if abs(carstate.angle) < CTR_ANG_MARGIN:
                 self.approach_succesful()
             else:
-                command.steering = -sign(carstate.distance_from_center)
-                if self.faces_middle:
+                if self.faces_middle or abs(carstate.angle) < 50: # TODO globalize
                     debug(self.iter,"        on road facing middle")
+                    command.steering = to_ang(carstate.angle)
                     command.gear = 1
-                    command.acceleration = ACC
-                else:
+                    command.accelerator = ACC
+                elif abs(dfc) > 0.5:
                     debug(self.iter,"        on road not facing middle")
+                    command.steering = away_from_ang(carstate.angle)
                     command.gear = -1
-                    command.acceleration = REV_ACC
-                debug(self.iter,"        acc=%.2f" %command.acceleration)
-                debug(self.iter,"        ang=%.2f" %carstate.angle)
-                debug(self.iter,"        ste=%.2f" %command.steering)
+                    command.accelerator = REV_ACC
+        
+        if self.is_blocked:
+            debug(self.iter, "ang=%.2f, spd=%.2f, dfc=%.2f"
+                      %(carstate.angle, carstate.speed_x, carstate.distance_from_center))
+            debug(self.iter, "ste=%.2f, acc=%.2f, gea=%.2f"
+                      %(command.steering, command.accelerator, command.gear))
+        
+        # when spinning out of control, don't do anything
+        if self.is_traveling_sideways or self.is_going_in_circles:
+            command.acceleration = 0
+        
+        # braking when shifting gear so it doesn't continue its course
+        if any(not g == command.gear for g in self.previous_gears[-3:]):
+            command.brake = 1
+            command.acceleration = 0
         return command
 
 #
@@ -272,16 +293,4 @@ def blocked(accels, gears, speed):
     """ Returns True if the car is blocked by something """
     same_gear = all([g > 0 for g in gears]) or all([g < 0 for g in gears])
     been_accel = all([a > 0 for a in accels])
-    return been_accel and same_gear and speed == 0
-
-
-
-
-def debug(iter, *args):
-    """ prints debug info to stderr """
-    if iter % 200 == 0:
-        print(iter, *args, " "*20, file=stderr)
-
-def err(iter, *args):
-    """ prints to standard error """
-    print(iter, *args, " "*20, file=stderr)
+    return been_accel and same_gear and abs(speed) < 1

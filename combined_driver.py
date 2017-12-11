@@ -13,6 +13,7 @@ from sys import stderr
 from math import radians
 from operator import sub
 
+from driver_utils import *
 from basic_control import BasicControl
 from swarm import FeromoneTrail
 from crisis_driver import CrisisDriver
@@ -22,19 +23,15 @@ from crisis_driver import CrisisDriver
 # - TODO clear up swarm global parameters
 # - TODO swarm debug output is piped to stderr
 
-PRINT_CYCLE_INTERVAL = 100 # freqency of print output in game cycles
-PRINT_STATE = True
-PRINT_COMMAND = False
-
 ENABLE_SWARM = True
 ENABLE_CRISIS_DRIVER = True
 
 # swarm metaparameters
-swarm_pos_int  = 20
-swarm_spd_int  = 10
+swarm_pos_int  = 50
+swarm_spd_int  = 20
 swarm_spd0     = 0
-swarm_spd_n    = 40
-swarm_expl_int = 50
+swarm_spd_n    = 20
+swarm_expl_int = 40
 
 class Final_Driver(Driver):
 
@@ -88,7 +85,7 @@ class Final_Driver(Driver):
 
         # crash and collision detection for swarm
         if ENABLE_SWARM:
-            if self.back_up_driver.is_off_road:
+            if self.back_up_driver.needs_help:
                 self.crashed_in_last_frame = True
             for dist in carstate.opponents:
                 if dist == 0:
@@ -99,6 +96,7 @@ class Final_Driver(Driver):
             if self.back_up_driver.is_in_control:
                 return self.back_up_driver.drive(carstate)
             elif self.back_up_driver.needs_help:
+                err(self.iter, "SWARM:  crashed")
                 self.back_up_driver.pass_control(carstate)
                 return self.back_up_driver.drive(carstate)
         
@@ -122,10 +120,10 @@ class Final_Driver(Driver):
 
         # checking in on the swarm
         position = carstate.distance_from_start
+        position = int(position - (position % self.swarm.pos_int))
         new_frame = position > (self.previous_frame_position + self.swarm.pos_int)
         new_lap = self.previous_frame_position > (position + self.swarm.pos_int)
         if ENABLE_SWARM and (new_frame or new_lap):
-            position = int(position - (position % self.swarm.pos_int))
             self.max_speed = self.swarm.check_in(
                                         position,
                                         carstate.speed_x,
@@ -134,7 +132,7 @@ class Final_Driver(Driver):
             self.crashed_in_last_frame = False
             self.contact_in_last_frame = False
             self.previous_frame_position = position
-        debug(self.iter, "SWARM:  max_speed=%i" %self.max_speed)
+            err(self.iter, "SWARM:  pos=%i, max_speed=%i" %(position, self.max_speed))
 
         # basic predictions
         gear       = self.basic_control.gear_decider(carstate)
@@ -165,6 +163,11 @@ class Final_Driver(Driver):
         command.steering = steer_pred
         command.gear = gear
 
+        if command.steering > 0.15:
+            debug(self.iter, "BASIC: turning right")
+        elif command.steering < -0.15:
+            debug(self.iter, "BASIC: turning left")
+
         return command
 
     def update_trackers(self, carstate):
@@ -181,14 +184,3 @@ class Final_Driver(Driver):
                  carstate.distance_raced,
                  self.cummulative_time + carstate.current_lap_time)
                , end=line_end)
-
-
-
-def debug(iter, *args):
-    """ prints debug info to stderr """
-    if iter % 200 == 0:
-        print(iter, *args, " "*20, file=stderr)
-
-def err(*args):
-    """ prints to standard error """
-    print(*args, " "*20, file=stderr)
