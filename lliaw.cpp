@@ -570,7 +570,7 @@ static void drive(int index, tCarElt* car, tSituation *situation)
 	ss << ",";
 	ss << car->_brakeCmd;
 	ss << ",";
-	ss << car->_steerCmd;
+	ss << steer;
 	ss << ",";
 
 	ss << angle;

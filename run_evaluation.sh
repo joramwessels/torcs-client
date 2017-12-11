@@ -15,6 +15,10 @@ sleep 1
 ( python3 train_tmp.py -p $PORT > client.out 2>&1 ) & client_pid=$!
 echo "$client_pid"
 
-sleep $TIMEOUT && kill -9 $server_pid > /dev/null 2>&1
-kill -9 $client_pid > /dev/null 2>&1
-kill -9 $(lsof -i:$PORT -t) > /dev/null 2>&1
+sleep $TIMEOUT
+kill -15 $client_pid > /dev/null 2>&1
+sleep 1
+kill -15 $server_pid > /dev/null 2>&1
+sleep 1
+kill -15 $(lsof -i:$PORT -t) > /dev/null 2>&1
+sleep 1

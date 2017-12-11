@@ -13,7 +13,7 @@ MSG_SHUTDOWN = b'***shutdown***'
 MSG_RESTART = b'***restart***'
 
 # timeout for socket connection in seconds and msec:
-TO_SOCKET_SEC = 1
+TO_SOCKET_SEC = 3
 TO_SOCKET_MSEC = TO_SOCKET_SEC * 1000
 
 

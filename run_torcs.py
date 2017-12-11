@@ -6,6 +6,7 @@ from pytocl.main import main
 from combined_driver import Final_Driver
 import os
 import signal
+import time
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--drivers', nargs='+', type=str)
@@ -62,15 +63,15 @@ def write_and_run(tree, track, steering_values, max_speed, timeout, port):
     steering_values = ", ".join([str(x) for x in steering_values])
     command = "./run_evaluation.sh '{}' {} {} {}".format(steering_values, max_speed, timeout, port)
     #["./run_evaluation.sh", steering_values, str(max_speed), str(timeout)]
-    completed_command = subprocess.run(command, shell=True, check=False, stdout=subprocess.PIPE)
+    completed_command = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE)
     pids = list(completed_command.stdout.decode("utf-8").strip().split())
     try:
-        os.kill(pid[0], signal.SIGINT)
+        os.kill(pid[0], signal.SIGTERM)
     except:
         pass
 
     try:
-        os.kill(pid[1], signal.SIGINT)
+        os.kill(pid[1], signal.SIGTERM)
     except:
         pass
     return completed_command
@@ -99,12 +100,14 @@ def run_on_tracks(driver, tracks, steering_values, max_speed, timeout):
             os.remove(server_temp_file)
         if os.path.isfile(client_temp_file):
             os.remove(client_temp_file)
+        time.sleep(1)
         set_track(root, track)
         completed_command = write_and_run(tree, track, steering_values, max_speed, timeout, port)
         with open("server.out") as f:
             server.append(f.readlines())
         with open("client.out") as f:
             client.append(list(f.readlines()))
+        time.sleep(1)
 
         # we cycle through the ports
         port_offset += 1
