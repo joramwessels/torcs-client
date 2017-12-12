@@ -19,7 +19,7 @@ learning_rate = 5e-7
 epochs = 10
 layers = 10
 units = 10
-allow_cuda = True
+allow_cuda = False
 use_cuda = torch.cuda.is_available() and allow_cuda
 
 class MLP(torch.nn.Module):
@@ -234,8 +234,8 @@ def test_on_train_set(model, x, max_pred=500):
     """
     for i in range(min(len(x), max_pred)):
         pred_y = list(model.predict(list(x[i].data)).data)
-        print(i,"acc: %.2f, brk: %.2f, ste: %.2f, gea: %.2f"
-                %(pred_y[0], pred_y[1], pred_y[2], pred_y[3]), end='\n')
+        print(i,"ang:%.2f, ste: %.2f"
+                %(x[0].data, pred_y[0]), end='\n')
 
 def main(folder, save_as, targets, inputs):
     x, y = read_all_files(folder, targets, inputs)
@@ -245,20 +245,20 @@ def main(folder, save_as, targets, inputs):
                   'x_max':find_max(x), 'y_max':find_max(y)}
     print("Normalizing data...")
     x, y = normalize(x, y, metaparams)
-    model = train_model(x, y, metaparams)
+    model = train_model(x[:12], y[:12], metaparams)
     print("Trained model for %i epochs" %epochs)
     # Always save as CPU model, cast to CUDA while loading if required
     torch.save(metaparams, save_as + ".meta")
     torch.save(model.float().state_dict(), save_as)
     print("Model saved as",save_as)
-    test_on_train_set(model, x[0])
+    #test_on_train_set(model, x[0])
     return model
 
 if __name__ == "__main__":
-    # targets: accelCmd, brakeCmd, steerCmd, gear
-    targets = [0, 1, 2, 8]
-    # inputs: angle, speed(X-Z), trackSens(0-18), distToMiddle
-    inputs = [3] + list(range(14, 24))
+    # targets: steerCmd
+    targets = [2]
+    # inputs: angle, speed_x, trackSens(0-18), distToMiddle
+    inputs = [3] + [11] + list(range(14, 34))
     model = main(sys.argv[1], sys.argv[2], targets, inputs)
 
 data_folder = "C:/Users/Joram/Documents/Studie/torcs-client/train_single/"

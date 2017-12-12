@@ -17,6 +17,7 @@ from driver_utils import *
 from basic_control import BasicControl
 from swarm import FeromoneTrail
 from crisis_driver import CrisisDriver
+from mlp import load_model
 
 # - NOTE crash detection for swarm only checks for off road
 # - NOTE collision detection for swarm might be too sensitive
@@ -25,6 +26,12 @@ from crisis_driver import CrisisDriver
 
 ENABLE_SWARM = True
 ENABLE_CRISIS_DRIVER = True
+ENABLE_NETWORK = False
+
+# Neural network parameters
+STR_MODELS = ["steering_model_1.pt", "steering_model_2.pt", "steering_model_2b.pt",
+              "steering_model_3.pt", "steering_model_3b.pt"]
+MODEL_FILENAME = STR_MODELS[0]
 
 # swarm metaparameters
 swarm_pos_int  = 50
@@ -64,6 +71,8 @@ class Final_Driver(Driver):
             self.crashed_in_last_frame = False
             self.contact_in_last_frame = False
             self.previous_frame_position = 0
+        if ENABLE_NETWORK:
+            self.steering_model = load_model(MODEL_FILENAME)
 
     def drive(self, carstate: State) -> Command:
         """ Description
@@ -135,18 +144,24 @@ class Final_Driver(Driver):
             err(self.iter, "SWARM:  pos=%i, max_speed=%i" %(position, self.max_speed))
 
         # basic predictions
+        if ENABLE_NETWORK:
+            steer_pred = self.steering_model.predict([carstate.angle, carstate.speed_x]
+                                                    + carstate.distances_from_edge
+                                                    + [carstate.distance_from_center])
+        else:
+            steer_pred = self.basic_control.steer_decider(carstate)
+        
         gear       = self.basic_control.gear_decider(carstate)
-        steer_pred = self.basic_control.steer_decider(carstate)
         pedal      = self.basic_control.speed_decider(carstate, max_speed=self.max_speed)
 
         # making sure we don't drive at people
         opponents_deltas = list(map(sub, carstate.opponents, self.last_opponents))
         steer_pred, pedal = self.basic_control.deal_with_opponents(steer_pred,
-                                                              pedal,
-                                                              carstate.speed_x,
-                                                              carstate.distance_from_center,
-                                                              carstate.opponents,
-                                                              opponents_deltas)
+                                                            pedal,
+                                                            carstate.speed_x,
+                                                            carstate.distance_from_center,
+                                                            carstate.opponents,
+                                                            opponents_deltas)
 
         # disambiguating pedal with smoothing
         brake, accel = self.basic_control.disambiguate_pedal(pedal, accel_cap=1.0)
@@ -154,7 +169,7 @@ class Final_Driver(Driver):
         # debug output
         if PRINT_COMMAND and self.iter % PRINT_CYCLE_INTERVAL:
             print("Executing comand: gear=%.2f, acc=%.2f," %(gear, accel),
-                  "break=%.2f, steering=%.2f" %(brake, steer_pred))
+                "break=%.2f, steering=%.2f" %(brake, steer_pred))
 
         # command construction
         command = Command()
