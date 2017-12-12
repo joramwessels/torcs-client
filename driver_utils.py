@@ -19,7 +19,7 @@ DFC_R, DFC_L = -1, 1
 
 # printing
 ENABLE_DEBUG_INFO = True
-PRINT_CYCLE_INTERVAL = 100 # freqency of print output in game cycles
+PRINT_CYCLE_INTERVAL = 50 # freqency of print output in game cycles
 PRINT_STATE = True
 PRINT_COMMAND = False
 
@@ -60,4 +60,5 @@ def debug(iter, *args):
 def err(iter, *args):
     if ENABLE_DEBUG_INFO:
         spc = 6-len(str(iter))
-        print(iter, ' '*spc, *args, " "*30, file=stderr)
+        ovwr = 50 - len(' '.join([str(x) for x in args]))
+        print(iter, ' '*spc, *args, ' '*ovwr, file=stderr)

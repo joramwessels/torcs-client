@@ -31,7 +31,7 @@ ENABLE_NETWORK = False
 # Neural network parameters
 STR_MODELS = ["steering_model_1.pt", "steering_model_2.pt", "steering_model_2b.pt",
               "steering_model_3.pt", "steering_model_3b.pt"]
-MODEL_FILENAME = STR_MODELS[0]
+MODEL_FILENAME = STR_MODELS[4]
 
 # swarm metaparameters
 swarm_pos_int  = 50
@@ -89,13 +89,15 @@ class Final_Driver(Driver):
 
         # trackers
         self.update_trackers(carstate)
-        if PRINT_STATE and (self.iter % PRINT_CYCLE_INTERVAL) == 0:
+        if PRINT_STATE:# and (self.iter % PRINT_CYCLE_INTERVAL) == 0:
             self.print_trackers(carstate, r=True)
 
         # crash and collision detection for swarm
         if ENABLE_SWARM:
-            if self.back_up_driver.needs_help:
+            if self.back_up_driver.needs_help or self.back_up_driver.is_off_road:
                 self.crashed_in_last_frame = True
+                if not self.crashed_in_last_frame:
+                    debug(self.iter, "SWARM:  crashed")
             for dist in carstate.opponents:
                 if dist == 0:
                     self.contact_in_last_frame = True
@@ -105,14 +107,17 @@ class Final_Driver(Driver):
             if self.back_up_driver.is_in_control:
                 return self.back_up_driver.drive(carstate)
             elif self.back_up_driver.needs_help:
-                err(self.iter, "SWARM:  crashed")
                 self.back_up_driver.pass_control(carstate)
                 return self.back_up_driver.drive(carstate)
 
         # since the data and python's values differ we need to adjust them
-        carstate.angle   = radians(carstate.angle)
-        carstate.speed_x = carstate.speed_x*3.6
-        command = self.make_next_command(carstate)
+        try:
+            carstate.angle   = radians(carstate.angle)
+            carstate.speed_x = carstate.speed_x*3.6
+            command = self.make_next_command(carstate)
+        except Exception as e:
+            err(self.iter, str(e))
+            command = self.back_up_driver.driver.drive(carstate)
 
         return command
 
@@ -146,8 +151,9 @@ class Final_Driver(Driver):
         # basic predictions
         if ENABLE_NETWORK:
             steer_pred = self.steering_model.predict([carstate.angle, carstate.speed_x]
-                                                    + carstate.distances_from_edge
+                                                    + list(carstate.distances_from_edge)
                                                     + [carstate.distance_from_center])
+            steer_pred = steer_pred[0]
         else:
             steer_pred = self.basic_control.steer_decider(carstate)
         
@@ -162,6 +168,11 @@ class Final_Driver(Driver):
                                                             carstate.distance_from_center,
                                                             carstate.opponents,
                                                             opponents_deltas)
+
+        # if too fast descelerate to max speed
+        if carstate.speed_x > self.max_speed:
+            pedal = 0.0
+            err(self.iter, "MAIN:   capping speed")
 
         # disambiguating pedal with smoothing
         brake, accel = self.basic_control.disambiguate_pedal(pedal, accel_cap=1.0)
@@ -178,10 +189,10 @@ class Final_Driver(Driver):
         command.steering = steer_pred
         command.gear = gear
 
-        if command.steering > 0.15:
-            debug(self.iter, "BASIC: turning right")
-        elif command.steering < -0.15:
+        if command.steering > 0.10:
             debug(self.iter, "BASIC: turning left")
+        elif command.steering < -0.10:
+            debug(self.iter, "BASIC: turning right")
 
         return command
 
@@ -195,7 +206,7 @@ class Final_Driver(Driver):
     def print_trackers(self, carstate, r=False):
         """ Prints info on the race """
         line_end = '\r' if r else '\n'
-        print("Lap=%i CurLapTime=%.2f dist=%.2f time=%.2f"
+        print("  Lap=%i CurLapTime=%.2f dist=%.2f time=%.2f"
                %(self.lap_counter,
                  carstate.current_lap_time,               
                  carstate.distance_raced,

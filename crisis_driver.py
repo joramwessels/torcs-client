@@ -20,7 +20,7 @@ PRP_ANG_MARGIN = 10
 
 # careful acceleration values during crisis handling
 ACC              = 0.1
-REV_ACC          = 0.1
+REV_ACC          = 0.2
 OFF_ROAD_ACC     = 0.1
 OFF_ROAD_REV_ACC = 0.2
 
@@ -34,8 +34,8 @@ MAX_ANGLES = 64 # amount of angles to keep track of
 MAX_ACCELS = 16  # amount of cycles in which you should have moved
 MAX_GEARS = MAX_ACCELS
 
-# TODO
-# - back off when blocked
+GEAR_SHIFTING_TRANSITION_CYCLES = 5
+
 # NOTE
 # steer left = positive
 # angle left = negative
@@ -50,7 +50,7 @@ class CrisisDriver(Driver):
         self.iter = 0
         self.driver = Driver(logdata=False)
         self.is_in_control = False
-        self.approaches = [self.navigate_to_middle, self.navigate_to_middle, self.original_implementation]
+        self.approaches = [self.navigate_to_middle, self.original_implementation]
         self.previous_angles = []
         self.previous_accels = []
         self.previous_gears  = []
@@ -198,6 +198,9 @@ class CrisisDriver(Driver):
             command:        The command to adjust
 
         """
+        if not self.is_off_road and abs(carstate.angle) < CTR_ANG_MARGIN:
+            self.approach_succesful()
+        command.gear, carstate.gear = 1, 1
         command = self.driver.drive(carstate) # TODO is this legal?
         is_stuck = abs(carstate.speed_x) <= 5 and carstate.current_lap_time >= 10
         #if self.bad_counter >= BAD_COUNTER_MANUAL_THRESHOLD and is_stuck:
@@ -207,6 +210,7 @@ class CrisisDriver(Driver):
             #     command.steering = -command.steering
             #     command.gear = -1
             # self.bad_counter = 200
+        command.accelerator /= 2.0
         return command
 
     def navigate_to_middle(self, carstate, command):
@@ -257,6 +261,8 @@ class CrisisDriver(Driver):
                     command.accelerator = REV_ACC
         
         if self.is_blocked:
+            command.gear = 1
+            command.accelerator *= 2
             debug(self.iter, "ang=%.2f, spd=%.2f, dfc=%.2f"
                       %(carstate.angle, carstate.speed_x, carstate.distance_from_center))
             debug(self.iter, "ste=%.2f, acc=%.2f, gea=%.2f"
@@ -266,10 +272,15 @@ class CrisisDriver(Driver):
         if self.is_traveling_sideways or self.is_going_in_circles:
             command.acceleration = 0
         
+        gstc = GEAR_SHIFTING_TRANSITION_CYCLES
         # braking when shifting gear so it doesn't continue its course
-        if any(not g == command.gear for g in self.previous_gears[-3:]):
+        if any(not g == command.gear for g in self.previous_gears[-gstc:]):
             command.brake = 1
             command.acceleration = 0
+        # faster acceleration after having shifted gears
+        elif any(not g == command.gear for g in self.previous_gears[-gstc*2:-gstc]):
+            command.brake = 0
+            command.acceleration = 1.0
         return command
 
 #
@@ -293,4 +304,4 @@ def blocked(accels, gears, speed):
     """ Returns True if the car is blocked by something """
     same_gear = all([g > 0 for g in gears]) or all([g < 0 for g in gears])
     been_accel = all([a > 0 for a in accels])
-    return been_accel and same_gear and abs(speed) < 1
+    return been_accel and same_gear and abs(speed) < 5

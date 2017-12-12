@@ -345,4 +345,5 @@ def breakable_speed(end_speed, trajectory):
     # in about 12-14 times its length, which would be 60-70m.
     # Assuming a linear decrease in speed, the maximum rate
     # of desceleration is therefore -280/65 = -4.31 km/h/m.
-    return trajectory * 4.31 + end_speed
+    # To be safe, we use half that: -2.15
+    return trajectory * 2.15 + end_speed

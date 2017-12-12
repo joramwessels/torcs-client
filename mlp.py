@@ -78,7 +78,7 @@ class MLP(torch.nn.Module):
         else: x_norm = x_var / self.x_scale
         pred_var = self.forward(x_norm)[0]
         pred_var = pred_var * self.y_scale
-        return pred_var
+        return [p.data[0] for p in pred_var]
 
 def train_model(x, y, metaparams):
     """ Trains a fully connected feed forward network
